@@ -60,9 +60,9 @@ void print_version() {
         "Version: " <<
         to_string(ASKIPLOT_VERSION_MAJOR) + "." +
         to_string(ASKIPLOT_VERSION_MINOR) + "." +
-        to_string(ASKIPLOT_VERSION_BUILD) <<
-        "\nThis is free software; see the source for copying conditions.  There is NO\n"
-        "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
-        "Repository: https://github.com/fsossai/AskiPlot" <<
+        to_string(ASKIPLOT_VERSION_BUILD) + "\n" <<
+        "Repository: https://github.com/fsossai/AskiPlot\n"
+        "This is free software; see the source for copying conditions.  There is NO\n"
+        "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE." <<
         endl;
 }

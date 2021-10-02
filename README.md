@@ -1,7 +1,7 @@
 # AskiPlot
 
 AskiPlot is a lightweight tool+library for creating plots by means of ASCII characters only.
-Users can plot CSV streams from the standard input or files
+Users can plot CSV streams from the standard input or files.
 
 ## Getting started
 

@@ -1,8 +1,8 @@
 #include <iostream>
-#include <cxxopts.hpp>
-#include <AskiPlot/AskiPlot.hpp>
 
 #include "version.hpp"
+#include "cxxopts.hpp"
+#include "askiplot/askiplot.hpp"
 
 using namespace std;
 
@@ -15,9 +15,9 @@ int main(int argc, char *argv[]) {
 		("d,delimiter", "Set a specific char as CSV delimiter.", cxxopts::value<char>())
         ("W,width","Canvas maximum width. Assuming the width of the current console as default value.", cxxopts::value<int>())
         ("H,height","Canvas maximum width. Assuming the height of the current console as default value.", cxxopts::value<int>())
-        ("pen-line","Set the character to be used for drawing lines.", cxxopts::value<char>()->default_value(DEFAULT_PEN_LINE))
-        ("pen-area","Set the character to be used for filling bars, or the area under curves.", cxxopts::value<char>()->default_value(DEFAULT_PEN_AREA))
-        ("pen-empty","Set the character to be used as background filler.", cxxopts::value<char>()->default_value(DEFAULT_PEN_EMPTY))
+        ("pen-line","Set the character to be used for drawing lines.", cxxopts::value<char>()->default_value(askiplot::kDefaultPenLine))
+        ("pen-area","Set the character to be used for filling bars, or the area under curves.", cxxopts::value<char>()->default_value(askiplot::kDefaultPenArea))
+        ("pen-empty","Set the character to be used as background filler.", cxxopts::value<char>()->default_value(askiplot::kDefaultPenEmpty))
         ("f,fill","Fill area under the curve. Use option --pen-area to set a custom char.")
         ("V,version","Display software version.")
         ("h,help","Display this help message.")
@@ -58,9 +58,9 @@ void print_version() {
     cout <<
         "AskiPlot\n"
         "Version: " <<
-        to_string(ASKIPLOT_VERSION_MAJOR) + "." +
-        to_string(ASKIPLOT_VERSION_MINOR) + "." +
-        to_string(ASKIPLOT_VERSION_BUILD) + "\n" <<
+        to_string(ASKIPLOT_VERSION_MAJOR) << "." <<
+        to_string(ASKIPLOT_VERSION_MINOR) << "." <<
+        to_string(ASKIPLOT_VERSION_BUILD) << "\n" <<
         "Repository: https://github.com/fsossai/AskiPlot\n"
         "This is free software; see the source for copying conditions.  There is NO\n"
         "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE." <<

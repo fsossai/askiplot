@@ -13,12 +13,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#pragma once
+#ifndef ASKIPLOT_HPP_
+#define ASKIPLOT_HPP_
 
 #include <iostream>
 #include <string>
 
-const std::string DEFAULT_PEN_LINE = "=";
-const std::string DEFAULT_PEN_AREA = "#";
-const std::string DEFAULT_PEN_EMPTY = " ";
+namespace askiplot {
 
+const std::string kDefaultPenLine = "=";
+const std::string kDefaultPenArea = "#";
+const std::string kDefaultPenEmpty = " ";
+
+} // namespace askiplot
+
+#endif // ASKIPLOT_HPP_

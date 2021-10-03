@@ -18,7 +18,7 @@ list(GET version_str 0 VERSION_MAJOR)
 list(GET version_str 1 VERSION_MINOR)
 list(GET version_str 2 VERSION_BUILD)
 message(STATUS "AskiPlot version: " ${VERSION_MAJOR} "." ${VERSION_MINOR} "." ${VERSION_BUILD})
-configure_file(${CMAKE_SOURCE_DIR}/include/AskiPlot/version.hpp.config ${CMAKE_CURRENT_BINARY_DIR}/include/version.hpp @ONLY)
+configure_file(${CMAKE_SOURCE_DIR}/include/askiplot/version.hpp.config ${CMAKE_CURRENT_BINARY_DIR}/include/version.hpp @ONLY)
 
 # The target 'askiplot' is the command-line tool
 add_executable(askiplot ${CMAKE_SOURCE_DIR}/src/main.cpp)

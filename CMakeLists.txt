@@ -9,17 +9,6 @@ if (NOT EXISTS ${CMAKE_SOURCE_DIR}/extern/cxxopts/include)
     )
 endif()
 
-
-# Getting the current version 
-file(READ ${CMAKE_SOURCE_DIR}/VERSION version_str)
-string(STRIP ${version_str} version_str)
-string(REPLACE "." ";" version_str ${version_str}) # String split
-list(GET version_str 0 VERSION_MAJOR)
-list(GET version_str 1 VERSION_MINOR)
-list(GET version_str 2 VERSION_BUILD)
-message(STATUS "AskiPlot version: " ${VERSION_MAJOR} "." ${VERSION_MINOR} "." ${VERSION_BUILD})
-configure_file(${CMAKE_SOURCE_DIR}/include/askiplot/version.hpp.config ${CMAKE_CURRENT_BINARY_DIR}/include/version.hpp @ONLY)
-
 # The target 'askiplot' is the command-line tool
 add_executable(askiplot ${CMAKE_SOURCE_DIR}/src/main.cpp)
 target_include_directories(askiplot PRIVATE

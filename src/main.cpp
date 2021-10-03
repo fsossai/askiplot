@@ -1,8 +1,10 @@
 #include <iostream>
 
-#include "version.hpp"
 #include "cxxopts.hpp"
 #include "askiplot/askiplot.hpp"
+
+#define ASKIPLOT_CMDLINE_VERSION_MAJOR 0
+#define ASKIPLOT_CMDLINE_VERSION_MINOR 1
 
 using namespace std;
 
@@ -57,10 +59,13 @@ int main(int argc, char *argv[]) {
 void print_version() {
     cout <<
         "AskiPlot\n"
-        "Version: " <<
+        "Library version: " <<
         to_string(ASKIPLOT_VERSION_MAJOR) << "." <<
         to_string(ASKIPLOT_VERSION_MINOR) << "." <<
-        to_string(ASKIPLOT_VERSION_BUILD) << "\n" <<
+        to_string(ASKIPLOT_VERSION_PATCH) << "\n" <<
+        "Command-line tool version: " << 
+        to_string(ASKIPLOT_CMDLINE_VERSION_MAJOR) << "." <<
+        to_string(ASKIPLOT_CMDLINE_VERSION_MINOR) << "\n" <<
         "Repository: https://github.com/fsossai/AskiPlot\n"
         "This is free software; see the source for copying conditions.  There is NO\n"
         "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE." <<

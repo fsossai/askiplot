@@ -19,6 +19,10 @@
 #include <iostream>
 #include <string>
 
+#define ASKIPLOT_VERSION_MAJOR 0
+#define ASKIPLOT_VERSION_MINOR 1
+#define ASKIPLOT_VERSION_PATCH 0
+
 namespace askiplot {
 
 const std::string kDefaultPenLine = "=";

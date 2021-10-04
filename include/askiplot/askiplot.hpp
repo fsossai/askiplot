@@ -32,6 +32,18 @@ namespace askiplot {
 const std::string kDefaultPenLine = "=";
 const std::string kDefaultPenArea = "#";
 const std::string kDefaultPenEmpty = " ";
+const int kConsoleHeight = 0;
+const int kConsoleWidth = 0;
+
+using borders_t = char;
+
+enum class CellStatus : char {
+  Empty = 0, Filled
+};
+
+enum Borders : char {
+  Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08
+};
 
 class InvalidPlotSize : public std::exception {
 public:
@@ -44,6 +56,13 @@ class PenNotSet : public std::exception {
 public:
   virtual const char* what() const noexcept override {
     return "Trying to access a Pen pointer that has not been set.";
+  }
+};
+
+class InconsistentData : public std::exception {
+public:
+  virtual const char* what() const noexcept override {
+    return "Data to be drawn is inconsistent.";
   }
 };
 
@@ -90,22 +109,112 @@ public:
 
 class Plot {
 public:
-  Plot(std::string label = "", int height = 0, int width = 0) 
+  Plot(std::string label = "", int height = kConsoleHeight, int width = kConsoleWidth) 
       : label_(label) {
     if (height < 0 || width < 0) {
       throw InvalidPlotSize();
     }
-    if (height == 0 || width == 0) {
+    if (height == kConsoleHeight || width == kConsoleWidth) {
       struct winsize w;
       ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      if (height == 0) height_ = w.ws_row;
-      if (width == 0) width_ = w.ws_col;
+      if (height == kConsoleHeight) height_ = w.ws_row;
+      if (width == kConsoleWidth) width_ = w.ws_col;
     }
     canvas_.resize(height * width);
+
+    xlim_left_ = 0.0;
+    xlim_right_ = 1.0;
+    ylim_bottom_ = 0.0;
+    ylim_top_ = 1.0;
   }
+
+  CellStatus& at(int col, int row) {
+    return canvas_[col + height_*row];
+  }
+
+  const CellStatus& at(int col, int row) const {
+    return canvas_[col + height_*row];
+  }
+
+  Plot& DrawPoint(double x, double y) {
+    if (xlim_left_ < x && x < xlim_right_ &&
+        ylim_bottom_ < y && y < ylim_top_) {
+      const double xstep = (xlim_right_ - xlim_left_) / width_;
+      const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+      at(static_cast<int>(x / xstep),
+         static_cast<int>(y / ystep)) = CellStatus::Filled;
+    }
+    return *this;
+  }
+
+  Plot& DrawPoints(const std::vector<double>& x, const std::vector<double>& y) {
+    if (x.size() != y.size()) {
+      throw InconsistentData();
+    }
+    const double xstep = (xlim_right_ - xlim_left_) / width_;
+    const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+    size_t n = x.size();
+    for (size_t i = 0; i < n; ++i) {
+      if (xlim_left_ < x[i] && x[i] < xlim_right_ &&
+          ylim_bottom_ < y[i] && y[i] < ylim_top_) {
+        at(static_cast<int>(x[i] / xstep),
+           static_cast<int>(y[i] / ystep)) = CellStatus::Filled;
+      }
+    }
+    return *this;
+  }
+
+  Plot& FillAreaUnderCurve() {
+    std::vector<int> stop_idx(width_, 0);
+    for (int i = 0; i < width_; ++i) {
+      for (int j = height_ - 1; j > 0; --j) {
+        if (at(i, j) == CellStatus::Filled) {
+          stop_idx[i] = j;
+          break;
+        }
+      }
+    }
+    for (int i = 0; i < width_; ++i) {
+      auto first = canvas_.begin() + i * height_;
+      auto last = first + stop_idx[i];
+      std::fill(first, last, CellStatus::Filled);
+    }
+    return *this;
+  }
+
+  Plot& DrawBorders(borders_t borders) {
+    if (borders & Borders::Left) {
+      auto first = canvas_.begin();
+      auto last = first + height_;
+      std::fill(first, last, CellStatus::Filled);
+    }
+    if (borders & Borders::Right) {
+      auto first = canvas_.begin();
+      first += height_ * (width_ - 1);
+      auto last = first + height_;
+      std::fill(first, last, CellStatus::Filled);
+    }
+    if (borders & Borders::Bottom) {
+      for (int i = 0; i < width_; ++i) {
+        at(i, 0) = CellStatus::Filled;
+      }
+    }
+    if (borders & Borders::Top) {
+      for (int i = 0; i < width_; ++i) {
+        at(i, height_ - 1) = CellStatus::Filled;
+      }
+    }
+    return *this;
+  }
+
+  // Getters
 
   std::string GetName() const { return name_; }
   std::string GetLabel() const { return label_; }
+  double GetXlimLeft() const { return xlim_left_; }
+  double GetXlimRight() const { return xlim_right_; }
+  double GetYlimBottom() const { return ylim_bottom_; }
+  double GetYlimTop() const { return ylim_top_; }
 
   Pen& GetPen() {
     if (pen_ == nullptr) {
@@ -121,20 +230,75 @@ public:
     return *pen_;
   }
 
+  // Setters
+
   Plot& SetName(std::string name) { name_ = name; return *this; }
   Plot& SetLabel(std::string label) { label_ = label; return *this; }
   Plot& SetPen(Pen *pen) { pen_ = pen; return *this; }
+
+  Plot& SetXlimLeft(double new_xlim_left) {
+    if (new_xlim_left < xlim_right_) {
+      xlim_left_ = new_xlim_left;
+    }
+    return *this;
+  }
+
+  Plot& SetXlimRight(double new_xlim_right) {
+    if (xlim_left_ < new_xlim_right) {
+      xlim_right_ = new_xlim_right;
+    }
+    return *this;
+  }
+
+  Plot& SetYlimBottom(double new_ylim_bottom) {
+    if (new_ylim_bottom < ylim_top_) {
+      ylim_bottom_ = new_ylim_bottom;
+    }
+    return *this;
+  }
+
+  Plot& SetYlimTop(double new_ylim_top) {
+    if (ylim_bottom_ < new_ylim_top) {
+      ylim_top_ = new_ylim_top;
+    }
+    return *this;
+  }
+
+  Plot& SetXlimits(double new_xlim_left, double new_xlim_right) {
+    if (new_xlim_left < new_xlim_right) {
+      xlim_left_ = new_xlim_left;
+      xlim_right_ = new_xlim_right;
+    }
+    return *this;
+  }
+
+  Plot& SetYlimits(double new_ylim_bottom, double new_ylim_top) {
+    if (new_ylim_bottom < new_ylim_top) {
+      ylim_bottom_ = new_ylim_bottom;
+      ylim_top_ = new_ylim_top;
+    }
+    return *this;
+  }
   
 protected:
   std::string name_;
   std::string label_;
   int height_;
   int width_;
-  std::vector<bool> canvas_;
+  std::vector<CellStatus> canvas_;
   Pen *pen_ = nullptr;
+  double xlim_left_;
+  double xlim_right_;
+  double ylim_bottom_;
+  double ylim_top_;
 private:
 };
 
+
+class HistPlot : public Plot {
+public:
+  HistPlot() = default;
+};
 
 
 } // namespace askiplot

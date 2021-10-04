@@ -9,6 +9,7 @@ if (NOT EXISTS ${CMAKE_SOURCE_DIR}/extern/cxxopts/include)
     )
 endif()
 
+
 # The target 'askiplot' is the command-line tool
 add_executable(askiplot ${CMAKE_SOURCE_DIR}/src/main.cpp)
 target_include_directories(askiplot PRIVATE
@@ -17,3 +18,7 @@ target_include_directories(askiplot PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/include
 )
 set_property(TARGET askiplot PROPERTY CXX_STANDARD 14)
+
+if (DEBUG)
+    target_compile_options(askiplot PRIVATE -Wall -Wextra -Wconversion)
+endif()

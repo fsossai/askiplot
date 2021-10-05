@@ -48,7 +48,7 @@ enum Borders : char {
   Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08
 };
 
-enum LegendPosition : char {
+enum Position : char {
   North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
 };
 
@@ -274,7 +274,7 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& DrawLegend(LegendPosition position = LegendPosition::NorthEast) {
+  Subtype& DrawLegend(Position position = Position::NorthEast) {
     if (metadata_.size() == 0) return static_cast<Subtype&>(*this);
 
     int text_width =
@@ -287,7 +287,7 @@ public:
 
     //const int loc_x = width_ - box_width - 2;
     //const int loc_y = height_ - box_height - 1;
-    auto locs = CalcLegendLocation(position, box_width, box_height);
+    auto locs = CalcBoxLocation(position, box_width, box_height);
     const int loc_x = locs.first;
     const int loc_y = locs.second;
 
@@ -308,9 +308,9 @@ public:
     }
 
     // Writing labels
-    for (int i = 0; i < metadata_.size(); ++i) {
-      DrawText(loc_x + 2, loc_y + box_height - 2 - i,
-               metadata_[i].pen.GetLine() + " " + metadata_[i].label
+    for (size_t i = 0; i < metadata_.size(); ++i) {
+      DrawText(metadata_[i].pen.GetLine() + " " + metadata_[i].label,
+               loc_x + 2, loc_y + box_height - 2 - i
       );
     }
     return static_cast<Subtype&>(*this);
@@ -354,12 +354,21 @@ public:
     return DrawPoints(x, y, std::numeric_limits<size_t>::max);
   }
 
-  Subtype& DrawText(int col, int row, const std::string& text) {
+  Subtype& DrawText(const std::string& text, int col, int row) {
     int n = std::min(width_ - col, static_cast<int>(text.size()));
     for (int i = 0; i < n; ++i) {
       at(i + col, row).SetValue(Pen(&text[i]), CellStatus::Line);
     }
     return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawText(const std::string& text, Position position) {
+    auto locs = CalcBoxLocation(position, text.size(), 1);
+    return DrawText(text, locs.first, locs.second);
+  }
+
+  Subtype& DrawTitle() {
+    return DrawText(title_, width_ / 2 - title_.size() / 2, height_ - 1);
   }
 
   Subtype& FillAreaUnderCurve() {
@@ -502,25 +511,25 @@ protected:
   std::vector<PlotMetadata> metadata_;
   
 private:
-  std::pair<int, int> CalcLegendLocation(LegendPosition pos, int box_width, int box_height) {
+  std::pair<int, int> CalcBoxLocation(Position pos, int box_width, int box_height) {
     switch (pos) {
-    case LegendPosition::North:
+    case Position::North:
       return std::pair<int, int>(width_ / 2 - box_width / 2, height_ - box_height - 1);
-    case LegendPosition::NorthEast:
+    case Position::NorthEast:
       return std::pair<int, int>(width_ - box_width - 2, height_ - box_height - 1);
-    case LegendPosition::East:
+    case Position::East:
       return std::pair<int, int>(width_ - box_width - 2, height_ / 2 - box_height / 2);
-    case LegendPosition::SouthEast:
+    case Position::SouthEast:
       return std::pair<int, int>(width_ - box_width - 2, 1);
-    case LegendPosition::South:
+    case Position::South:
       return std::pair<int, int>(width_ / 2 - box_width / 2, 1);
-    case LegendPosition::SouthWest:
+    case Position::SouthWest:
       return std::pair<int, int>(2, 1);
-    case LegendPosition::West:
+    case Position::West:
       return std::pair<int, int>(2, height_ / 2 - box_height / 2);
-    case LegendPosition::NorthWest:
+    case Position::NorthWest:
       return std::pair<int, int>(2, height_ - box_height - 1);
-    case LegendPosition::Center:
+    case Position::Center:
       return std::pair<int, int>(width_  / 2 - box_width  / 2,
                                  height_ / 2 - box_height / 2
       );
@@ -532,7 +541,6 @@ class __PlotDummySubtype : public Plot<__PlotDummySubtype> { };
 
 class HistPlot : public Plot<HistPlot> {
 public:
-  HistPlot() = default;
 };
 
 

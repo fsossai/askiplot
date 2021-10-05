@@ -22,6 +22,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #define ASKIPLOT_VERSION_MAJOR 0
 #define ASKIPLOT_VERSION_MINOR 1
@@ -37,9 +38,7 @@ const int kConsoleWidth = 0;
 
 using borders_t = char;
 
-enum class CellStatus : char {
-  Empty = 0, Filled
-};
+enum class CellStatus { Line, Empty, Area };
 
 enum Borders : char {
   Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08
@@ -52,13 +51,6 @@ public:
   }
 };
 
-class PenNotSet : public std::exception {
-public:
-  virtual const char* what() const noexcept override {
-    return "Trying to access a Pen pointer that has not been set.";
-  }
-};
-
 class InconsistentData : public std::exception {
 public:
   virtual const char* what() const noexcept override {
@@ -68,43 +60,132 @@ public:
 
 class Pen {
 public:
-  Pen() = default;
-  virtual ~Pen() = default;
-  virtual std::string GetValue() const { return value_; }
-  virtual void SetDefaultValue() = 0;
-  virtual void SetValue(const std::string&) = 0;
-protected:
-  std::string value_;
-};
-
-class ASCIIPen : public Pen {
-public:
-  ASCIIPen(const std::string& value) { SetValue(value); }
-  void SetDefaultValue() override { value_ = " "; }
-  void SetValue(const std::string& value) override {
-    if (value.size() == 0) {
-      SetDefaultValue();
-    } else {
-      value_.resize(1);
-      value_[0] = value[0];
-    }
+  Pen(const std::string& line = kDefaultPenLine,
+      const std::string& empty = kDefaultPenEmpty,
+      const std::string& area = kDefaultPenArea) {
+    SetLine(line);
+    SetEmpty(empty);
+    SetArea(area);
   }
+  
+  Pen(const char *line,
+      const char *empty = kDefaultPenEmpty.data(),
+      const char *area = kDefaultPenArea.data()) {
+    SetLine(line);
+    SetEmpty(empty);
+    SetArea(area);
+  }
+
+  Pen(const Pen&) = default;
+  Pen(Pen&&) = default;
+  Pen& operator=(const Pen&) = default;
+  Pen& operator=(Pen&&) = default;
+  ~Pen() = default;
+  
+  // Getters
+
+  std::string GetLine() const { return line_; }
+  std::string GetEmpty() const { return empty_; }
+  std::string GetArea() const { return area_; }
+
+  // Setters
+
+  Pen& SetLine(const std::string& line) {
+    line_ = (line.size() == 0) ? kDefaultPenLine : line;
+    return *this;
+  }
+
+  Pen& SetEmpty(const std::string& empty) {
+    empty_ = (empty.size() == 0) ? kDefaultPenEmpty : empty;
+    return *this;
+  }
+
+  Pen& SetArea(const std::string& area) {
+    area_ = (area.size() == 0) ? kDefaultPenArea : area;
+    return *this;
+  }
+
 private:
+  std::string line_;
+  std::string empty_;
+  std::string area_;
 };
 
-class UTF16Pen : public Pen {
+class Cell {
 public:
-  UTF16Pen(const std::string& value) { SetValue(value); }
-  void SetDefaultValue() override { value_ = "\u0020"; }
-  void SetValue(const std::string& value) override {
-    if (value.size() < 2) {
-      SetDefaultValue();
-    } else {
-      value_.resize(2);
+  Cell()
+      : status_(CellStatus::Empty) {
+    SetValue(kDefaultPenEmpty);
+  }
+
+  Cell(const Cell&) = default;
+  Cell(Cell&&) = default;
+  Cell& operator=(const Cell&) = default;
+  Cell& operator=(Cell&&) = default;
+  ~Cell() = default;
+
+  std::string GetValue() const {
+    if (value_[1] == 0x00) {
+      return std::string(value_, 1);
+    }
+    return std::string(value_, 2);
+  }
+
+  Cell& SetValue(const std::string& value, const CellStatus& status) {
+    status_ = status;
+    if (value.size() == 0) {
+      value_[0] = value_[1] = 0x00;
+    } else if (value.size() == 1) {
+      value_[0] = value[0];
+      value_[1] = 0x00;
+    } else if (value.size() == 2) {
       value_[0] = value[0];
       value_[1] = value[1];
+    } else if (value.size() > 2) {
+      value_[0] = value[0];
+      value_[1] = value[1];
+      std::fprintf(stderr,
+        "The string '%s' is to long as a Pen candidate and has been truncated.\n",
+        value.c_str());
     }
+    return *this;
   }
+
+  Cell& SetValue(const std::string& value) {
+    SetValue(value, status_);
+    return *this;
+  }
+
+  Cell& SetValue(const Pen& pen, const CellStatus& status) {
+    status_ = status;
+    switch (status) {
+    case CellStatus::Line:
+      SetValue(pen.GetLine(), status);
+      break;
+    case CellStatus::Empty:
+      SetValue(pen.GetEmpty(), status);
+      break;
+    case CellStatus::Area:
+      SetValue(pen.GetArea(), status);
+      break;
+    }
+    return *this;
+  }
+
+  Cell& SetValue(const Pen& pen) {
+    SetValue(pen, status_);
+    return *this;
+  }
+
+  const CellStatus& GetStatus() const { return status_; }
+
+  bool IsLine() const { return status_ == CellStatus::Line; }
+  bool IsEmpty() const { return status_ == CellStatus::Empty; }
+  bool IsArea() const { return status_ == CellStatus::Area; }
+
+private:
+  char value_[2];
+  CellStatus status_;
 };
 
 class Plot {
@@ -117,10 +198,10 @@ public:
     if (height == kConsoleHeight || width == kConsoleWidth) {
       struct winsize w;
       ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      if (height == kConsoleHeight) height_ = w.ws_row;
+      if (height == kConsoleHeight) height_ = w.ws_row - 1;
       if (width == kConsoleWidth) width_ = w.ws_col;
     }
-    canvas_.resize(height * width);
+    canvas_.resize(height_ * width_);
 
     xlim_left_ = 0.0;
     xlim_right_ = 1.0;
@@ -128,12 +209,12 @@ public:
     ylim_top_ = 1.0;
   }
 
-  CellStatus& at(int col, int row) {
-    return canvas_[col + height_*row];
+  Cell& at(int col, int row) {
+    return canvas_[row + height_*col];
   }
 
-  const CellStatus& at(int col, int row) const {
-    return canvas_[col + height_*row];
+  const Cell& at(int col, int row) const {
+    return canvas_[row + height_*col];
   }
 
   Plot& DrawPoint(double x, double y) {
@@ -142,7 +223,8 @@ public:
       const double xstep = (xlim_right_ - xlim_left_) / width_;
       const double ystep = (ylim_top_ - ylim_bottom_) / height_;
       at(static_cast<int>(x / xstep),
-         static_cast<int>(y / ystep)) = CellStatus::Filled;
+         static_cast<int>(y / ystep))
+        .SetValue(pen_, CellStatus::Line);
     }
     return *this;
   }
@@ -153,12 +235,39 @@ public:
     }
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
     size_t n = x.size();
     for (size_t i = 0; i < n; ++i) {
       if (xlim_left_ < x[i] && x[i] < xlim_right_ &&
           ylim_bottom_ < y[i] && y[i] < ylim_top_) {
         at(static_cast<int>(x[i] / xstep),
-           static_cast<int>(y[i] / ystep)) = CellStatus::Filled;
+           static_cast<int>(y[i] / ystep)) = cell_line;
+      }
+    }
+    return *this;
+  }
+
+  Plot& DrawBorders(borders_t borders) {
+    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+    if (borders & Borders::Left) {
+      auto first = canvas_.begin();
+      auto last = first + height_;
+      std::fill(first, last, cell_line);
+    }
+    if (borders & Borders::Right) {
+      auto first = canvas_.begin();
+      first += height_ * (width_ - 1);
+      auto last = first + height_;
+      std::fill(first, last, cell_line);
+    }
+    if (borders & Borders::Bottom) {
+      for (int i = 0; i < width_; ++i) {
+        at(i, 0) = cell_line;
+      }
+    }
+    if (borders & Borders::Top) {
+      for (int i = 0; i < width_; ++i) {
+        at(i, height_ - 1) = cell_line;
       }
     }
     return *this;
@@ -168,73 +277,51 @@ public:
     std::vector<int> stop_idx(width_, 0);
     for (int i = 0; i < width_; ++i) {
       for (int j = height_ - 1; j > 0; --j) {
-        if (at(i, j) == CellStatus::Filled) {
+        if (!at(i, j).IsEmpty()) {
           stop_idx[i] = j;
           break;
         }
       }
     }
+
+    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
     for (int i = 0; i < width_; ++i) {
       auto first = canvas_.begin() + i * height_;
       auto last = first + stop_idx[i];
-      std::fill(first, last, CellStatus::Filled);
+      std::fill(first, last, cell_line);
     }
     return *this;
   }
 
-  Plot& DrawBorders(borders_t borders) {
-    if (borders & Borders::Left) {
-      auto first = canvas_.begin();
-      auto last = first + height_;
-      std::fill(first, last, CellStatus::Filled);
-    }
-    if (borders & Borders::Right) {
-      auto first = canvas_.begin();
-      first += height_ * (width_ - 1);
-      auto last = first + height_;
-      std::fill(first, last, CellStatus::Filled);
-    }
-    if (borders & Borders::Bottom) {
+  std::string Serialize() const {
+    std::stringstream ss("");
+    for (int j = height_ - 1; j >= 0; --j) {
       for (int i = 0; i < width_; ++i) {
-        at(i, 0) = CellStatus::Filled;
+        ss << at(i, j).GetValue();
       }
+      ss << "\n";
     }
-    if (borders & Borders::Top) {
-      for (int i = 0; i < width_; ++i) {
-        at(i, height_ - 1) = CellStatus::Filled;
-      }
-    }
-    return *this;
+    return ss.str();
   }
 
   // Getters
 
   std::string GetName() const { return name_; }
   std::string GetLabel() const { return label_; }
+  int GetWidth() const { return width_; }
+  int GetHeight() const { return height_; }
   double GetXlimLeft() const { return xlim_left_; }
   double GetXlimRight() const { return xlim_right_; }
   double GetYlimBottom() const { return ylim_bottom_; }
   double GetYlimTop() const { return ylim_top_; }
-
-  Pen& GetPen() {
-    if (pen_ == nullptr) {
-      throw PenNotSet();
-    }
-    return *pen_;
-  }
-
-  const Pen& GetPen() const {
-    if (pen_ == nullptr) {
-      throw PenNotSet();
-    }
-    return *pen_;
-  }
+  Pen& GetPen() { return pen_; }
+  const Pen& GetPen() const { return pen_; }
 
   // Setters
 
   Plot& SetName(std::string name) { name_ = name; return *this; }
   Plot& SetLabel(std::string label) { label_ = label; return *this; }
-  Plot& SetPen(Pen *pen) { pen_ = pen; return *this; }
+  Plot& SetPen(const Pen& pen) { pen_ = pen; return *this; }
 
   Plot& SetXlimLeft(double new_xlim_left) {
     if (new_xlim_left < xlim_right_) {
@@ -285,8 +372,8 @@ protected:
   std::string label_;
   int height_;
   int width_;
-  std::vector<CellStatus> canvas_;
-  Pen *pen_ = nullptr;
+  std::vector<Cell> canvas_;
+  Pen pen_;
   double xlim_left_;
   double xlim_right_;
   double ylim_bottom_;

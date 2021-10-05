@@ -19,10 +19,13 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <iostream>
+#include <limits>
+//#include <numeric>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
 
 #define ASKIPLOT_VERSION_MAJOR 0
 #define ASKIPLOT_VERSION_MINOR 1
@@ -37,11 +40,16 @@ const int kConsoleHeight = 0;
 const int kConsoleWidth = 0;
 
 using borders_t = char;
+using size_t = std::size_t;
 
-enum class CellStatus { Line, Empty, Area };
+enum class CellStatus : uint16_t { Line, Empty, Area };
 
 enum Borders : char {
   Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08
+};
+
+enum LegendPosition : char {
+  North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
 };
 
 class InvalidPlotSize : public std::exception {
@@ -122,15 +130,16 @@ public:
 
 private:
   std::string CheckAndReformat(const std::string& candidate) const {
-    std::string result("xx");
+    std::string result;
     if (candidate.size() == 0) {
       throw InvalidCellOrPenValue();
     } else if (std::isprint(static_cast<unsigned char>(candidate[0]))) {
+      result.resize(1);
       result[0] = candidate[0];
-      result[1] = '\0';
     } else if (candidate.size() == 1) {
       throw InvalidCellOrPenValue();
     } else {
+      result.resize(2);
       result[0] = candidate[0];
       result[1] = candidate[1];
     }
@@ -198,13 +207,23 @@ private:
   CellStatus status_;
 };
 
+struct PlotMetadata {
+  PlotMetadata& SetLabel(const std::string& l) { label = l; return *this; }
+  PlotMetadata& SetLength(size_t l) { length = l; return *this; }
+  PlotMetadata& SetPen(const Pen& p) { pen = p; return *this; }
+  
+  Pen pen;
+  size_t length = 0;
+  std::string label = "";
+};
+
 class __PlotDummySubtype;
 
 template<class Subtype = __PlotDummySubtype>
 class Plot {
 public:
-  Plot(std::string label = "", int height = kConsoleHeight, int width = kConsoleWidth) 
-      : label_(label) {
+  Plot(std::string title = "", int height = kConsoleHeight, int width = kConsoleWidth) 
+      : title_(title) {
     if (height < 0 || width < 0) {
       throw InvalidPlotSize();
     }
@@ -214,12 +233,11 @@ public:
       if (height == kConsoleHeight) height_ = w.ws_row - 1;
       if (width == kConsoleWidth) width_ = w.ws_col;
     }
-    canvas_.resize(height_ * width_);
-
     xlim_left_ = 0.0;
     xlim_right_ = 1.0;
     ylim_bottom_ = 0.0;
     ylim_top_ = 1.0;
+    canvas_.resize(height_ * width_);
   }
 
   Cell& at(int col, int row) {
@@ -228,36 +246,6 @@ public:
 
   const Cell& at(int col, int row) const {
     return canvas_[row + height_*col];
-  }
-
-  Subtype& DrawPoint(double x, double y) {
-    if (xlim_left_ < x && x < xlim_right_ &&
-        ylim_bottom_ < y && y < ylim_top_) {
-      const double xstep = (xlim_right_ - xlim_left_) / width_;
-      const double ystep = (ylim_top_ - ylim_bottom_) / height_;
-      at(static_cast<int>(x / xstep),
-         static_cast<int>(y / ystep))
-        .SetValue(pen_, CellStatus::Line);
-    }
-    return static_cast<Subtype&>(*this);
-  }
-
-  Subtype& DrawPoints(const std::vector<double>& x, const std::vector<double>& y) {
-    if (x.size() != y.size()) {
-      throw InconsistentData();
-    }
-    const double xstep = (xlim_right_ - xlim_left_) / width_;
-    const double ystep = (ylim_top_ - ylim_bottom_) / height_;
-    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
-    size_t n = x.size();
-    for (size_t i = 0; i < n; ++i) {
-      if (xlim_left_ < x[i] && x[i] < xlim_right_ &&
-          ylim_bottom_ < y[i] && y[i] < ylim_top_) {
-        at(static_cast<int>(x[i] / xstep),
-           static_cast<int>(y[i] / ystep)) = cell_line;
-      }
-    }
-    return static_cast<Subtype&>(*this);
   }
 
   Subtype& DrawBorders(borders_t borders) {
@@ -286,6 +274,94 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& DrawLegend(LegendPosition position = LegendPosition::NorthEast) {
+    if (metadata_.size() == 0) return static_cast<Subtype&>(*this);
+
+    int text_width =
+      std::max_element(metadata_.begin(), metadata_.end(),
+                       [](const auto& a, const auto& b)
+                       { return a.label.size() < b.label.size(); }
+      )->label.size();
+    const int box_width = text_width + 6;
+    const int box_height = metadata_.size() + 2;
+
+    //const int loc_x = width_ - box_width - 2;
+    //const int loc_y = height_ - box_height - 1;
+    auto locs = CalcLegendLocation(position, box_width, box_height);
+    const int loc_x = locs.first;
+    const int loc_y = locs.second;
+
+    // Setting up Cells
+    auto cell_bottom = Cell{}.SetValue(Pen("_"), CellStatus::Line);
+    auto cell_top = Cell{}.SetValue(Pen("_"), CellStatus::Line);
+    auto cell_left = Cell{}.SetValue(Pen("|"), CellStatus::Line);
+    auto cell_right = Cell{}.SetValue(Pen("|"), CellStatus::Line);
+
+    // Drawing box borders
+    for (int i = loc_x; i < loc_x + box_width; ++i) {
+      at(i, loc_y) = cell_bottom;                 // Bottom
+      at(i, loc_y + box_height - 1) = cell_top;   // Top
+    }
+    for (int j = loc_y; j < loc_y + box_height - 1; ++j) {
+      at(loc_x, j) = cell_left;                    // Left
+      at(loc_x + box_width - 1, j) = cell_right;   // Right
+    }
+
+    // Writing labels
+    for (int i = 0; i < metadata_.size(); ++i) {
+      DrawText(loc_x + 2, loc_y + box_height - 2 - i,
+               metadata_[i].pen.GetLine() + " " + metadata_[i].label
+      );
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  template<class Tx, class Ty>
+  Subtype& DrawPoint(Tx x, Ty y) {
+    if (xlim_left_ < x && x < xlim_right_ &&
+        ylim_bottom_ < y && y < ylim_top_) {
+      const double xstep = (xlim_right_ - xlim_left_) / width_;
+      const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+      at(static_cast<int>(x / xstep),
+         static_cast<int>(y / ystep))
+        .SetValue(pen_, CellStatus::Line);
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  template<class Tx, class Ty>
+  Subtype& DrawPoints(const std::vector<Tx>& x,
+                      const std::vector<Ty>& y,
+                      size_t how_many) {
+    const size_t n = std::min({x.size(), y.size(), how_many});
+    const double xstep = (xlim_right_ - xlim_left_) / width_;
+    const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+
+    for (size_t i = 0; i < n; ++i) {
+      if (xlim_left_ < x[i] && x[i] < xlim_right_ &&
+          ylim_bottom_ < y[i] && y[i] < ylim_top_) {
+        at(static_cast<int>(x[i] / xstep),
+           static_cast<int>(y[i] / ystep)) = cell_line;
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  template<class Tx, class Ty>
+  Subtype& DrawPoints(const std::vector<Tx>& x,
+                      const std::vector<Ty>& y) {
+    return DrawPoints(x, y, std::numeric_limits<size_t>::max);
+  }
+
+  Subtype& DrawText(int col, int row, const std::string& text) {
+    int n = std::min(width_ - col, static_cast<int>(text.size()));
+    for (int i = 0; i < n; ++i) {
+      at(i + col, row).SetValue(Pen(&text[i]), CellStatus::Line);
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
   Subtype& FillAreaUnderCurve() {
     std::vector<int> stop_idx(width_, 0);
     for (int i = 0; i < width_; ++i) {
@@ -303,7 +379,28 @@ public:
       auto last = first + stop_idx[i];
       std::fill(first, last, cell_line);
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
+  }
+
+  template<class Tx, class Ty>
+  Subtype& PlotData(const std::vector<Tx>& x,
+                    const std::vector<Ty>& y,
+                    const std::string& label,
+                    size_t how_many) {
+    DrawPoints(x, y, how_many);
+    metadata_.push_back(
+      PlotMetadata{}.SetLabel(label)
+                    .SetLength(how_many)
+                    .SetPen(pen_)
+    );
+    return static_cast<Subtype&>(*this);
+  }
+
+  template<class Tx, class Ty>
+  Subtype& PlotData(const std::vector<Tx>& x,
+                    const std::vector<Ty>& y,
+                    const std::string& label) {
+    return PlotData(x, y, label, std::numeric_limits<size_t>::max());
   }
 
   std::string Serialize() const {
@@ -320,7 +417,7 @@ public:
   // Getters
 
   std::string GetName() const { return name_; }
-  std::string GetLabel() const { return label_; }
+  std::string GetTitle() const { return title_; }
   int GetWidth() const { return width_; }
   int GetHeight() const { return height_; }
   double GetXlimLeft() const { return xlim_left_; }
@@ -337,12 +434,12 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype &SetLabel(std::string label) {
-    label_ = label;
+  Subtype& SetTitle(std::string title) {
+    title_ = title;
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype &SetPen(const Pen &pen) {
+  Subtype& SetPen(const Pen &pen) {
     pen_ = pen;
     return static_cast<Subtype&>(*this);
   }
@@ -393,16 +490,42 @@ public:
   
 protected:
   std::string name_;
-  std::string label_;
+  std::string title_;
   int height_;
   int width_;
-  std::vector<Cell> canvas_;
   Pen pen_;
   double xlim_left_;
   double xlim_right_;
   double ylim_bottom_;
   double ylim_top_;
+  std::vector<Cell> canvas_;
+  std::vector<PlotMetadata> metadata_;
+  
 private:
+  std::pair<int, int> CalcLegendLocation(LegendPosition pos, int box_width, int box_height) {
+    switch (pos) {
+    case LegendPosition::North:
+      return std::pair<int, int>(width_ / 2 - box_width / 2, height_ - box_height - 1);
+    case LegendPosition::NorthEast:
+      return std::pair<int, int>(width_ - box_width - 2, height_ - box_height - 1);
+    case LegendPosition::East:
+      return std::pair<int, int>(width_ - box_width - 2, height_ / 2 - box_height / 2);
+    case LegendPosition::SouthEast:
+      return std::pair<int, int>(width_ - box_width - 2, 1);
+    case LegendPosition::South:
+      return std::pair<int, int>(width_ / 2 - box_width / 2, 1);
+    case LegendPosition::SouthWest:
+      return std::pair<int, int>(2, 1);
+    case LegendPosition::West:
+      return std::pair<int, int>(2, height_ / 2 - box_height / 2);
+    case LegendPosition::NorthWest:
+      return std::pair<int, int>(2, height_ - box_height - 1);
+    case LegendPosition::Center:
+      return std::pair<int, int>(width_  / 2 - box_width  / 2,
+                                 height_ / 2 - box_height / 2
+      );
+    }
+  }
 };
 
 class __PlotDummySubtype : public Plot<__PlotDummySubtype> { };

@@ -60,7 +60,13 @@ public:
 
 class Pen {
 public:
-  Pen(const std::string& line = kDefaultPenLine,
+  Pen() {
+    SetLine(kDefaultPenLine);
+    SetEmpty(kDefaultPenEmpty);
+    SetArea(kDefaultPenArea);
+  }
+
+  Pen(const std::string& line,
       const std::string& empty = kDefaultPenEmpty,
       const std::string& area = kDefaultPenArea) {
     SetLine(line);

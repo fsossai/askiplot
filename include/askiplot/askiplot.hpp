@@ -58,6 +58,15 @@ public:
   }
 };
 
+class InvalidCellOrPenValue : public std::exception {
+public:
+  virtual const char* what() const noexcept override {
+    return
+      "The value of a Cell or a Pen must be a single ASCII character or a single UTF16 char "
+      "and cannot be 0x00 (string termination character).";
+  }
+};
+
 class Pen {
 public:
   Pen() {
@@ -97,21 +106,37 @@ public:
   // Setters
 
   Pen& SetLine(const std::string& line) {
-    line_ = (line.size() == 0) ? kDefaultPenLine : line;
+    line_ = CheckAndReformat(line.size() == 0 ? kDefaultPenLine : line);
     return *this;
   }
 
   Pen& SetEmpty(const std::string& empty) {
-    empty_ = (empty.size() == 0) ? kDefaultPenEmpty : empty;
+    empty_ = CheckAndReformat(empty.size() == 0 ? kDefaultPenEmpty : empty);
     return *this;
   }
 
   Pen& SetArea(const std::string& area) {
-    area_ = (area.size() == 0) ? kDefaultPenArea : area;
+    area_ = CheckAndReformat(area.size() == 0 ? kDefaultPenArea : area);
     return *this;
   }
 
 private:
+  std::string CheckAndReformat(const std::string& candidate) const {
+    std::string result("xx");
+    if (candidate.size() == 0) {
+      throw InvalidCellOrPenValue();
+    } else if (std::isprint(static_cast<unsigned char>(candidate[0]))) {
+      result[0] = candidate[0];
+      result[1] = '\0';
+    } else if (candidate.size() == 1) {
+      throw InvalidCellOrPenValue();
+    } else {
+      result[0] = candidate[0];
+      result[1] = candidate[1];
+    }
+    return result;
+  }
+
   std::string line_;
   std::string empty_;
   std::string area_;
@@ -119,9 +144,8 @@ private:
 
 class Cell {
 public:
-  Cell()
-      : status_(CellStatus::Empty) {
-    SetValue(kDefaultPenEmpty);
+  Cell() {
+    SetValue(kDefaultPenEmpty, CellStatus::Empty);
   }
 
   Cell(const Cell&) = default;
@@ -131,48 +155,23 @@ public:
   ~Cell() = default;
 
   std::string GetValue() const {
-    if (value_[1] == 0x00) {
+    if (value_[1] == '\0') {
       return std::string(value_, 1);
     }
     return std::string(value_, 2);
   }
 
-  Cell& SetValue(const std::string& value, const CellStatus& status) {
-    status_ = status;
-    if (value.size() == 0) {
-      value_[0] = value_[1] = 0x00;
-    } else if (value.size() == 1) {
-      value_[0] = value[0];
-      value_[1] = 0x00;
-    } else if (value.size() == 2) {
-      value_[0] = value[0];
-      value_[1] = value[1];
-    } else if (value.size() > 2) {
-      value_[0] = value[0];
-      value_[1] = value[1];
-      std::fprintf(stderr,
-        "The string '%s' is to long as a Pen candidate and has been truncated.\n",
-        value.c_str());
-    }
-    return *this;
-  }
-
-  Cell& SetValue(const std::string& value) {
-    SetValue(value, status_);
-    return *this;
-  }
-
   Cell& SetValue(const Pen& pen, const CellStatus& status) {
     status_ = status;
-    switch (status) {
+    switch (status) { 
     case CellStatus::Line:
-      SetValue(pen.GetLine(), status);
+      SetValueRaw(pen.GetLine());
       break;
     case CellStatus::Empty:
-      SetValue(pen.GetEmpty(), status);
+      SetValueRaw(pen.GetEmpty());
       break;
     case CellStatus::Area:
-      SetValue(pen.GetArea(), status);
+      SetValueRaw(pen.GetArea());
       break;
     }
     return *this;
@@ -190,6 +189,11 @@ public:
   bool IsArea() const { return status_ == CellStatus::Area; }
 
 private:
+  void SetValueRaw(const std::string& value) {
+    value_[0] = value[0];
+    value_[1] = value[1];
+  }
+
   char value_[2];
   CellStatus status_;
 };

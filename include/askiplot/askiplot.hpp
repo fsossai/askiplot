@@ -198,6 +198,9 @@ private:
   CellStatus status_;
 };
 
+class __PlotDummySubtype;
+
+template<class Subtype = __PlotDummySubtype>
 class Plot {
 public:
   Plot(std::string label = "", int height = kConsoleHeight, int width = kConsoleWidth) 
@@ -227,7 +230,7 @@ public:
     return canvas_[row + height_*col];
   }
 
-  Plot& DrawPoint(double x, double y) {
+  Subtype& DrawPoint(double x, double y) {
     if (xlim_left_ < x && x < xlim_right_ &&
         ylim_bottom_ < y && y < ylim_top_) {
       const double xstep = (xlim_right_ - xlim_left_) / width_;
@@ -236,10 +239,10 @@ public:
          static_cast<int>(y / ystep))
         .SetValue(pen_, CellStatus::Line);
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
-  Plot& DrawPoints(const std::vector<double>& x, const std::vector<double>& y) {
+  Subtype& DrawPoints(const std::vector<double>& x, const std::vector<double>& y) {
     if (x.size() != y.size()) {
       throw InconsistentData();
     }
@@ -254,10 +257,10 @@ public:
            static_cast<int>(y[i] / ystep)) = cell_line;
       }
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
-  Plot& DrawBorders(borders_t borders) {
+  Subtype& DrawBorders(borders_t borders) {
     const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
     if (borders & Borders::Left) {
       auto first = canvas_.begin();
@@ -280,10 +283,10 @@ public:
         at(i, height_ - 1) = cell_line;
       }
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
-  Plot& FillAreaUnderCurve() {
+  Subtype& FillAreaUnderCurve() {
     std::vector<int> stop_idx(width_, 0);
     for (int i = 0; i < width_; ++i) {
       for (int j = height_ - 1; j > 0; --j) {
@@ -329,52 +332,63 @@ public:
 
   // Setters
 
-  Plot& SetName(std::string name) { name_ = name; return *this; }
-  Plot& SetLabel(std::string label) { label_ = label; return *this; }
-  Plot& SetPen(const Pen& pen) { pen_ = pen; return *this; }
+  Subtype& SetName(std::string name) {
+    name_ = name;
+    return static_cast<Subtype&>(*this);
+  }
 
-  Plot& SetXlimLeft(double new_xlim_left) {
+  Subtype &SetLabel(std::string label) {
+    label_ = label;
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype &SetPen(const Pen &pen) {
+    pen_ = pen;
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& SetXlimLeft(double new_xlim_left) {
     if (new_xlim_left < xlim_right_) {
       xlim_left_ = new_xlim_left;
     }
     return *this;
   }
 
-  Plot& SetXlimRight(double new_xlim_right) {
+  Subtype& SetXlimRight(double new_xlim_right) {
     if (xlim_left_ < new_xlim_right) {
       xlim_right_ = new_xlim_right;
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
-  Plot& SetYlimBottom(double new_ylim_bottom) {
+  Subtype& SetYlimBottom(double new_ylim_bottom) {
     if (new_ylim_bottom < ylim_top_) {
       ylim_bottom_ = new_ylim_bottom;
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
-  Plot& SetYlimTop(double new_ylim_top) {
+  Subtype& SetYlimTop(double new_ylim_top) {
     if (ylim_bottom_ < new_ylim_top) {
       ylim_top_ = new_ylim_top;
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
-  Plot& SetXlimits(double new_xlim_left, double new_xlim_right) {
+  Subtype& SetXlimits(double new_xlim_left, double new_xlim_right) {
     if (new_xlim_left < new_xlim_right) {
       xlim_left_ = new_xlim_left;
       xlim_right_ = new_xlim_right;
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
-  Plot& SetYlimits(double new_ylim_bottom, double new_ylim_top) {
+  Subtype& SetYlimits(double new_ylim_bottom, double new_ylim_top) {
     if (new_ylim_bottom < new_ylim_top) {
       ylim_bottom_ = new_ylim_bottom;
       ylim_top_ = new_ylim_top;
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
   
 protected:
@@ -391,8 +405,9 @@ protected:
 private:
 };
 
+class __PlotDummySubtype : public Plot<__PlotDummySubtype> { };
 
-class HistPlot : public Plot {
+class HistPlot : public Plot<HistPlot> {
 public:
   HistPlot() = default;
 };

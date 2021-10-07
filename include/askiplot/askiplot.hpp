@@ -65,6 +65,10 @@ enum Position : char {
   North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
 };
 
+double operator ""_percent(long double p) {
+  return p / 100.0;
+}
+
 class InvalidPlotSize : public std::exception {
 public:
   virtual const char* what() const noexcept override {
@@ -256,6 +260,8 @@ public:
     canvas_.resize(height_ * width_);
   }
 
+  virtual ~__IPlot() = default;
+
   Cell& at(int col, int row) {
     return canvas_[row + height_*col];
   }
@@ -341,9 +347,57 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& DrawLineHorizontalAtRow(int row) {
+    if (row < height_) {
+      auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+      for (int i = 0; i < width_; ++i) {
+        at(i, row) = cell_line;
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawLineHorizontalAtRow(double height_ratio) {
+    int row = height_ * std::max(0.0, std::min(1.0, height_ratio));
+    return DrawLineHorizontalAtRow(row);
+  }
+
+  Subtype& DrawLineVerticalAtCol(int col) {
+    if (col < width_) {
+      auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+      for (int j = 0; j < height_; ++j) {
+        at(col, j) = cell_line;
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawLineVerticalAtCol(double width_ratio) {
+    int col = width_ * std::max(0.0, std::min(1.0, width_ratio));
+    return DrawLineVerticalAtCol(col);
+  }
+
+  Subtype& DrawLineHorizontalAtY(double y) {
+    if (ylim_bottom_ < y && y < ylim_top_) {
+      return DrawLineHorizontalAtRow(static_cast<int>(
+        (y - ylim_bottom_) / ((ylim_top_ - ylim_bottom_) / height_)
+      ));
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawLineVerticallAtX(double x) {
+    if (xlim_left_ < x && x < xlim_right_) {
+      return DrawLineVerticalAtCol(static_cast<int>(
+        (x - xlim_left_) / ((xlim_right_ - xlim_left_) / width_)
+      ));
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
   template<class Tx, class Ty>
   Subtype& DrawPoint(Tx x, Ty y) {
-    if (xlim_left_ < x && x < xlim_right_ &&
+    if (xlim_left_   < x && x < xlim_right_ &&
         ylim_bottom_ < y && y < ylim_top_) {
       const double xstep = (xlim_right_ - xlim_left_) / width_;
       const double ystep = (ylim_top_ - ylim_bottom_) / height_;
@@ -367,7 +421,7 @@ public:
     const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
 
     for (std::size_t i = 0; i < n; ++i) {
-      if (xlim_left_ < x[i] && x[i] < xlim_right_ &&
+      if (xlim_left_   < x[i] && x[i] < xlim_right_ &&
           ylim_bottom_ < y[i] && y[i] < ylim_top_) {
         at(static_cast<int>((x[i] - xlim_left_  ) / xstep),
            static_cast<int>((y[i] - ylim_bottom_) / ystep)) = cell_line;
@@ -623,12 +677,13 @@ private:
   }
 };
 
-class Plot : public __IPlot<Plot> { };
-
-class HistPlot final : public Plot {
+template<class Subtype>
+class __IHistPlot : public __IPlot<Subtype> {
 public:
 };
 
+class Plot final : public __IPlot<Plot> { };
+class HistPlot final : __IHistPlot<HistPlot> { };
 
 } // namespace askiplot
 

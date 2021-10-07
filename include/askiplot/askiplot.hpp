@@ -247,10 +247,10 @@ public:
       if (width == kConsoleWidth) width_ = w.ws_col;
     }
     autolimit_ = Borders::All;
-    xlim_margin_ = 1.025;
+    xlim_margin_ = 0.05;
     xlim_left_ = 0.0;
     xlim_right_ = 1.0;
-    ylim_margin_ = 1.010;
+    ylim_margin_ = 0.020;
     ylim_bottom_ = 0.0;
     ylim_top_ = 1.0;
     canvas_.resize(height_ * width_);
@@ -347,8 +347,8 @@ public:
         ylim_bottom_ < y && y < ylim_top_) {
       const double xstep = (xlim_right_ - xlim_left_) / width_;
       const double ystep = (ylim_top_ - ylim_bottom_) / height_;
-      at(static_cast<int>(x / xstep),
-         static_cast<int>(y / ystep))
+      at(static_cast<int>((x - xlim_left_  ) / xstep),
+         static_cast<int>((y - ylim_bottom_) / ystep))
         .SetValue(pen_, CellStatus::Line);
     }
     return static_cast<Subtype&>(*this);
@@ -358,7 +358,7 @@ public:
   Subtype& DrawPoints(const std::vector<Tx>& x,
                       const std::vector<Ty>& y,
                       std::size_t how_many) {
-    //SetAutoLimits(x, y);
+    SetAutoLimits(x, y);
     
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
@@ -369,8 +369,8 @@ public:
     for (std::size_t i = 0; i < n; ++i) {
       if (xlim_left_ < x[i] && x[i] < xlim_right_ &&
           ylim_bottom_ < y[i] && y[i] < ylim_top_) {
-        at(static_cast<int>(x[i] / xstep),
-           static_cast<int>(y[i] / ystep)) = cell_line;
+        at(static_cast<int>((x[i] - xlim_left_  ) / xstep),
+           static_cast<int>((y[i] - ylim_bottom_) / ystep)) = cell_line;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -379,7 +379,7 @@ public:
   template<class Tx, class Ty>
   Subtype& DrawPoints(const std::vector<Tx>& x,
                       const std::vector<Ty>& y) {
-    return DrawPoints(x, y, std::numeric_limits<std::size_t>::max);
+    return DrawPoints(x, y, std::numeric_limits<std::size_t>::max());
   }
 
   Subtype& DrawText(const std::string& text, int col, int row) {
@@ -581,10 +581,10 @@ private:
 
   template<class Tx, class Ty>
   void SetAutoLimits(const std::vector<Tx>& x,
-                                     const std::vector<Ty>& y) {
+                     const std::vector<Ty>& y) {
     // Left and Right
-    auto x_margin_surplus = [this](){ return (xlim_right_ - xlim_left_) * xlim_margin_; };
-    auto y_margin_surplus = [this](){ return (ylim_top_ - ylim_bottom_) * ylim_margin_; };
+    auto x_margin_surplus = [this](){ return std::abs((xlim_right_ - xlim_left_) * xlim_margin_); };
+    auto y_margin_surplus = [this](){ return std::abs((ylim_top_ - ylim_bottom_) * ylim_margin_); };
     
     if (autolimit_ & Borders::Left) {
       if (autolimit_ & Borders::Right) {
@@ -592,11 +592,11 @@ private:
         xlim_left_ = *mm.first;
         xlim_right_ = *mm.second;
         double ms = x_margin_surplus();
-        xlim_left_ += ms;
+        xlim_left_ -= ms;
         xlim_right_ += ms;
       } else {
         xlim_left_ = *std::min_element(x.begin(), x.end());
-        xlim_left_ += x_margin_surplus();
+        xlim_left_ -= x_margin_surplus();
       }
     } else if (autolimit_ & Borders::Right) {
       xlim_right_ = *std::max_element(x.begin(), x.end());
@@ -610,7 +610,7 @@ private:
         ylim_bottom_ = *(mm.first);
         ylim_top_ = *(mm.second);
         double ms = y_margin_surplus();
-        ylim_bottom_ += ms;
+        ylim_bottom_ -= ms;
         ylim_top_ += ms;
       } else {
         ylim_bottom_ = *std::min_element(y.begin(), y.end());

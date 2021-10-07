@@ -230,12 +230,12 @@ struct PlotMetadata {
   std::string label = "";
 };
 
-class __PlotDummySubtype;
+class Plot;
 
-template<class Subtype = __PlotDummySubtype>
-class Plot {
+template<class Subtype = Plot>
+class __IPlot {
 public:
-  Plot(std::string title = "", int height = kConsoleHeight, int width = kConsoleWidth) 
+  __IPlot(std::string title = "", int height = kConsoleHeight, int width = kConsoleWidth) 
       : title_(title) {
     if (height < 0 || width < 0) {
       throw InvalidPlotSize();
@@ -623,9 +623,9 @@ private:
   }
 };
 
-class __PlotDummySubtype : public Plot<__PlotDummySubtype> { };
+class Plot : public __IPlot<Plot> { };
 
-class HistPlot : public Plot<HistPlot> {
+class HistPlot final : public Plot {
 public:
 };
 

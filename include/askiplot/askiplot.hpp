@@ -39,14 +39,27 @@ const std::string kDefaultPenEmpty = " ";
 const int kConsoleHeight = 0;
 const int kConsoleWidth = 0;
 
-using borders_t = char;
-using size_t = std::size_t;
-
 enum class CellStatus : uint16_t { Line, Empty, Area };
 
 enum Borders : char {
-  Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08
+  None = 0x00, Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08, All = 0x0F
 };
+
+Borders operator+(const Borders& a, const Borders& b) {
+  return static_cast<Borders>(static_cast<char>(a) | static_cast<char>(b));
+}
+
+Borders operator-(const Borders& a, const Borders& b) {
+  return static_cast<Borders>(static_cast<char>(a) & (~static_cast<char>(b)));
+}
+
+Borders operator&(const Borders& a, const Borders& b) {
+  return static_cast<Borders>(static_cast<char>(a) & static_cast<char>(b));
+}
+
+Borders operator|(const Borders& a, const Borders& b) {
+  return a + b;
+}
 
 enum Position : char {
   North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
@@ -209,11 +222,11 @@ private:
 
 struct PlotMetadata {
   PlotMetadata& SetLabel(const std::string& l) { label = l; return *this; }
-  PlotMetadata& SetLength(size_t l) { length = l; return *this; }
+  PlotMetadata& SetLength(std::size_t l) { length = l; return *this; }
   PlotMetadata& SetPen(const Pen& p) { pen = p; return *this; }
   
   Pen pen;
-  size_t length = 0;
+  std::size_t length = 0;
   std::string label = "";
 };
 
@@ -233,8 +246,11 @@ public:
       if (height == kConsoleHeight) height_ = w.ws_row - 1;
       if (width == kConsoleWidth) width_ = w.ws_col;
     }
+    autolimit_ = Borders::All;
+    xlim_margin_ = 1.025;
     xlim_left_ = 0.0;
     xlim_right_ = 1.0;
+    ylim_margin_ = 1.010;
     ylim_bottom_ = 0.0;
     ylim_top_ = 1.0;
     canvas_.resize(height_ * width_);
@@ -248,7 +264,18 @@ public:
     return canvas_[row + height_*col];
   }
 
-  Subtype& DrawBorders(borders_t borders) {
+  Subtype& AutoLimit(Borders borders) {
+    autolimit_ = borders;
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& Clear() {
+    auto cell_empty = Cell{}.SetValue(pen_, CellStatus::Empty);
+    std::fill(canvas_.begin(), canvas_.end(), cell_empty);
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawBorders(Borders borders) {
     const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
     if (borders & Borders::Left) {
       auto first = canvas_.begin();
@@ -285,8 +312,6 @@ public:
     const int box_width = text_width + 6;
     const int box_height = metadata_.size() + 2;
 
-    //const int loc_x = width_ - box_width - 2;
-    //const int loc_y = height_ - box_height - 1;
     auto locs = CalcBoxLocation(position, box_width, box_height);
     const int loc_x = locs.first;
     const int loc_y = locs.second;
@@ -308,7 +333,7 @@ public:
     }
 
     // Writing labels
-    for (size_t i = 0; i < metadata_.size(); ++i) {
+    for (std::size_t i = 0; i < metadata_.size(); ++i) {
       DrawText(metadata_[i].pen.GetLine() + " " + metadata_[i].label,
                loc_x + 2, loc_y + box_height - 2 - i
       );
@@ -332,13 +357,16 @@ public:
   template<class Tx, class Ty>
   Subtype& DrawPoints(const std::vector<Tx>& x,
                       const std::vector<Ty>& y,
-                      size_t how_many) {
-    const size_t n = std::min({x.size(), y.size(), how_many});
+                      std::size_t how_many) {
+    //SetAutoLimits(x, y);
+    
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+    
+    const std::size_t n = std::min({x.size(), y.size(), how_many});
     const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
 
-    for (size_t i = 0; i < n; ++i) {
+    for (std::size_t i = 0; i < n; ++i) {
       if (xlim_left_ < x[i] && x[i] < xlim_right_ &&
           ylim_bottom_ < y[i] && y[i] < ylim_top_) {
         at(static_cast<int>(x[i] / xstep),
@@ -351,7 +379,7 @@ public:
   template<class Tx, class Ty>
   Subtype& DrawPoints(const std::vector<Tx>& x,
                       const std::vector<Ty>& y) {
-    return DrawPoints(x, y, std::numeric_limits<size_t>::max);
+    return DrawPoints(x, y, std::numeric_limits<std::size_t>::max);
   }
 
   Subtype& DrawText(const std::string& text, int col, int row) {
@@ -369,6 +397,17 @@ public:
 
   Subtype& DrawTitle() {
     return DrawText(title_, width_ / 2 - title_.size() / 2, height_ - 1);
+  }
+
+  Subtype& Fill(const Pen& pen) {
+    auto cell_new = Cell{}.SetValue(pen, CellStatus::Line);
+    std::fill(canvas_.begin(), canvas_.end(), cell_new);
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& Fill() {
+    Fill(pen_);
+    return static_cast<Subtype&>(*this);
   }
 
   Subtype& FillAreaUnderCurve() {
@@ -395,7 +434,7 @@ public:
   Subtype& PlotData(const std::vector<Tx>& x,
                     const std::vector<Ty>& y,
                     const std::string& label,
-                    size_t how_many) {
+                    std::size_t how_many) {
     DrawPoints(x, y, how_many);
     metadata_.push_back(
       PlotMetadata{}.SetLabel(label)
@@ -409,7 +448,7 @@ public:
   Subtype& PlotData(const std::vector<Tx>& x,
                     const std::vector<Ty>& y,
                     const std::string& label) {
-    return PlotData(x, y, label, std::numeric_limits<size_t>::max());
+    return PlotData(x, y, label, std::numeric_limits<std::size_t>::max());
   }
 
   std::string Serialize() const {
@@ -503,8 +542,11 @@ protected:
   int height_;
   int width_;
   Pen pen_;
+  Borders autolimit_;
+  double xlim_margin_;
   double xlim_left_;
   double xlim_right_;
+  double ylim_margin_;
   double ylim_bottom_;
   double ylim_top_;
   std::vector<Cell> canvas_;
@@ -515,6 +557,7 @@ private:
     switch (pos) {
     case Position::North:
       return std::pair<int, int>(width_ / 2 - box_width / 2, height_ - box_height - 1);
+    default:
     case Position::NorthEast:
       return std::pair<int, int>(width_ - box_width - 2, height_ - box_height - 1);
     case Position::East:
@@ -533,6 +576,49 @@ private:
       return std::pair<int, int>(width_  / 2 - box_width  / 2,
                                  height_ / 2 - box_height / 2
       );
+    }
+  }
+
+  template<class Tx, class Ty>
+  void SetAutoLimits(const std::vector<Tx>& x,
+                                     const std::vector<Ty>& y) {
+    // Left and Right
+    auto x_margin_surplus = [this](){ return (xlim_right_ - xlim_left_) * xlim_margin_; };
+    auto y_margin_surplus = [this](){ return (ylim_top_ - ylim_bottom_) * ylim_margin_; };
+    
+    if (autolimit_ & Borders::Left) {
+      if (autolimit_ & Borders::Right) {
+        auto mm = std::minmax_element(x.begin(), x.end());
+        xlim_left_ = *mm.first;
+        xlim_right_ = *mm.second;
+        double ms = x_margin_surplus();
+        xlim_left_ += ms;
+        xlim_right_ += ms;
+      } else {
+        xlim_left_ = *std::min_element(x.begin(), x.end());
+        xlim_left_ += x_margin_surplus();
+      }
+    } else if (autolimit_ & Borders::Right) {
+      xlim_right_ = *std::max_element(x.begin(), x.end());
+      xlim_right_ += x_margin_surplus();
+    }
+
+    // Bottom and Top
+    if (autolimit_ & Borders::Bottom) {
+      if (autolimit_ & Borders::Top) {
+        auto mm = std::minmax_element(y.begin(), y.end());
+        ylim_bottom_ = *(mm.first);
+        ylim_top_ = *(mm.second);
+        double ms = y_margin_surplus();
+        ylim_bottom_ += ms;
+        ylim_top_ += ms;
+      } else {
+        ylim_bottom_ = *std::min_element(y.begin(), y.end());
+        ylim_bottom_ += y_margin_surplus();
+      }
+    } else if (autolimit_ & Borders::Top) {
+      ylim_top_ = *std::max_element(y.begin(), y.end());
+      ylim_top_ += y_margin_surplus();
     }
   }
 };

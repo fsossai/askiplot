@@ -234,9 +234,7 @@ struct PlotMetadata {
   std::string label = "";
 };
 
-class Plot;
-
-template<class Subtype = Plot>
+template<class Subtype>
 class __IPlot {
 public:
   __IPlot(std::string title = "", int height = kConsoleHeight, int width = kConsoleWidth) 
@@ -262,11 +260,11 @@ public:
 
   virtual ~__IPlot() = default;
 
-  Cell& at(int col, int row) {
+  virtual Cell& at(int col, int row) {
     return canvas_[row + height_*col];
   }
 
-  const Cell& at(int col, int row) const {
+  virtual const Cell& at(int col, int row) const {
     return canvas_[row + height_*col];
   }
 
@@ -284,15 +282,14 @@ public:
   Subtype& DrawBorders(Borders borders) {
     const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
     if (borders & Borders::Left) {
-      auto first = canvas_.begin();
-      auto last = first + height_;
-      std::fill(first, last, cell_line);
+      for (int j = 0; j < height_; ++j) {
+        at(0, j) = cell_line;
+      }
     }
     if (borders & Borders::Right) {
-      auto first = canvas_.begin();
-      first += height_ * (width_ - 1);
-      auto last = first + height_;
-      std::fill(first, last, cell_line);
+      for (int j = 0; j < height_; ++j) {
+        at(width_ - 1, j) = cell_line;
+      }
     }
     if (borders & Borders::Bottom) {
       for (int i = 0; i < width_; ++i) {
@@ -379,18 +376,16 @@ public:
 
   Subtype& DrawLineHorizontalAtY(double y) {
     if (ylim_bottom_ < y && y < ylim_top_) {
-      return DrawLineHorizontalAtRow(static_cast<int>(
-        (y - ylim_bottom_) / ((ylim_top_ - ylim_bottom_) / height_)
-      ));
+      int row = (y - ylim_bottom_) / ((ylim_top_ - ylim_bottom_) / height_);
+      return DrawLineHorizontalAtRow(row);
     }
     return static_cast<Subtype&>(*this);
   }
 
   Subtype& DrawLineVerticallAtX(double x) {
     if (xlim_left_ < x && x < xlim_right_) {
-      return DrawLineVerticalAtCol(static_cast<int>(
-        (x - xlim_left_) / ((xlim_right_ - xlim_left_) / width_)
-      ));
+      int col = (x - xlim_left_) / ((xlim_right_ - xlim_left_) / width_);
+      return DrawLineVerticalAtCol(col);
     }
     return static_cast<Subtype&>(*this);
   }
@@ -589,7 +584,7 @@ public:
     }
     return static_cast<Subtype&>(*this);
   }
-  
+
 protected:
   std::string name_;
   std::string title_;
@@ -683,7 +678,7 @@ public:
 };
 
 class Plot final : public __IPlot<Plot> { };
-class HistPlot final : __IHistPlot<HistPlot> { };
+class HistPlot final : public __IHistPlot<HistPlot> { };
 
 } // namespace askiplot
 

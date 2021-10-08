@@ -412,6 +412,60 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& DrawLine(double x_begin, double y_begin, double x_end, double y_end) {
+    auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+
+    const double xstep = (xlim_right_ - xlim_left_) / width_;
+    const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+   
+    auto to_col = [=](double x) -> int { return (x - xlim_left_  ) / xstep; };
+    auto to_row = [=](double y) -> int { return (y - ylim_bottom_) / ystep; };
+   
+    const int col_beg = to_col(x_begin);
+    const int row_beg = to_row(y_begin);
+    const int col_end = to_col(x_end);
+    const int row_end = to_row(y_end);
+   
+    const int delta_col = col_end - col_beg;
+    const int delta_row = row_end - row_beg;
+    const int n = std::max(std::abs(delta_col), std::abs(delta_row)) + 1;
+    
+    if (std::abs(delta_col) < std::abs(delta_row)) {
+      const double x_adv = (x_end - x_begin) / n;
+      const int j_adv = (row_beg < row_end) ? +1 : -1;
+      double x_current = x_begin;
+      for (int j = 0; std::abs(j) < n; j += j_adv) {
+        at(to_col(x_current), row_beg + j) = cell_line;
+        x_current += x_adv;
+      }
+    } else {
+      const double y_adv = (y_end - y_begin) / n;
+      const int i_adv = (col_beg < col_end) ? +1 : -1;
+      double y_current = y_begin;
+      for (int i = 0; std::abs(i) < n; i += i_adv) {
+        at(col_beg + i, to_row(y_current)) = cell_line;
+        y_current += y_adv;
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawLine(const Position& begin, const Position& end) {
+    const double xstep = (xlim_right_ - xlim_left_) / width_;
+    const double ystep = (ylim_top_ - ylim_bottom_) / height_;
+    
+    auto to_x = [=](int col) -> double { return col * xstep + xlim_left_; };
+    auto to_y = [=](int row) -> double { return row * ystep + ylim_bottom_; };
+
+    auto pos_beg_abs = GetAbsolutePosition(begin);
+    auto pos_end_abs = GetAbsolutePosition(end);
+
+    DrawLine(to_x(pos_beg_abs.offset.GetCol()), to_y(pos_beg_abs.offset.GetRow()),
+             to_x(pos_end_abs.offset.GetCol()), to_y(pos_end_abs.offset.GetRow()));
+    
+    return static_cast<Subtype&>(*this);
+  }
+
   Subtype& DrawLineHorizontalAtRow(int row) {
     if (row < height_) {
       auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
@@ -504,7 +558,8 @@ public:
 
     if (adjust) {
       int new_col = std::min<int>(pos_abs.offset.GetCol(), width_ - text.size());
-      pos_abs.offset.SetCol(new_col);
+      int new_row = std::min<int>(pos_abs.offset.GetRow(), height_ - 1);
+      pos_abs.offset = Offset(new_col, new_row);
     }
 
     const int col = pos_abs.offset.GetCol();
@@ -519,8 +574,12 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& DrawTextCentered(const std::string& text, const Position& position, bool adjust = false) {
+    return DrawText(text, position - Offset(text.size() / 2, 0), adjust);
+  }
+
   Subtype& DrawTitle() {
-    return DrawText(title_, North - Offset(title_.size() / 2, 0), true);
+    return DrawTextCentered(title_, North, false);
   }
 
   Subtype& Fill(const Pen& pen) {
@@ -531,26 +590,6 @@ public:
 
   Subtype& Fill() {
     Fill(pen_);
-    return static_cast<Subtype&>(*this);
-  }
-
-  Subtype& FillAreaUnderCurve() {
-    std::vector<int> stop_idx(width_, 0);
-    for (int i = 0; i < width_; ++i) {
-      for (int j = height_ - 1; j > 0; --j) {
-        if (!at(i, j).IsEmpty()) {
-          stop_idx[i] = j;
-          break;
-        }
-      }
-    }
-
-    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
-    for (int i = 0; i < width_; ++i) {
-      auto first = canvas_.begin() + i * height_;
-      auto last = first + stop_idx[i];
-      std::fill(first, last, cell_line);
-    }
     return static_cast<Subtype&>(*this);
   }
 

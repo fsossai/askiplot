@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
-//#include <numeric>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -45,6 +44,10 @@ enum Borders : char {
   None = 0x00, Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08, All = 0x0F
 };
 
+enum RelativePosition : char {
+  North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
+};
+
 Borders operator+(const Borders& a, const Borders& b) {
   return static_cast<Borders>(static_cast<char>(a) | static_cast<char>(b));
 }
@@ -59,14 +62,6 @@ Borders operator&(const Borders& a, const Borders& b) {
 
 Borders operator|(const Borders& a, const Borders& b) {
   return a + b;
-}
-
-enum Position : char {
-  North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
-};
-
-double operator ""_percent(long double p) {
-  return p / 100.0;
 }
 
 class InvalidPlotSize : public std::exception {
@@ -91,6 +86,78 @@ public:
       "and cannot be 0x00 (string termination character).";
   }
 };
+
+class Offset {
+public:
+  Offset()
+      : col_(0)
+      , row_(0) { }
+
+  Offset(int col, int row)
+      : col_(col)
+      , row_(row) { }
+
+  Offset(const std::pair<int, int>& cr_pair)
+      : col_(cr_pair.first)
+      , row_(cr_pair.second) { }
+
+  int GetCol() const { return col_; }
+  int GetRow() const { return row_; }
+  Offset& SetCol(int col) { col_ = col; return *this; }
+  Offset& SetRow(int row) { row_ = row; return *this; }
+
+private:
+  int col_, row_;
+};
+
+struct Position {
+  Position(int col, int row, const RelativePosition& relative = SouthWest)
+      : offset(col, row)
+      , relative(relative) { }
+  
+  Position(const Offset& offset, const RelativePosition& relative = SouthWest)
+      : offset(offset)
+      , relative(relative) { }
+
+  Position(const RelativePosition& relative = SouthWest)
+      : offset(0, 0)
+      , relative(relative) { }
+
+  bool IsAbsolute() const { return relative == SouthWest; }
+
+  Offset offset;
+  RelativePosition relative;
+};
+
+
+
+double operator ""_percent(long double p) {
+  return p / 100.0;
+}
+
+Offset operator+(const Offset& a, const Offset& b) {
+  return Offset(a.GetCol() + b.GetCol(), a.GetRow() + b.GetRow());
+}
+
+Offset operator-(const Offset& a, const Offset& b) {
+  return Offset(a.GetCol() - b.GetCol(), a.GetRow() - b.GetRow());
+}
+
+Position operator+(const RelativePosition& relative, const Offset& offset) {
+  return Position(offset, relative);
+}
+
+Position operator+(const Offset& offset, const RelativePosition& relative) {
+  return Position(offset, relative);
+}
+
+Position operator+(const Position& position, const Offset& offset) {
+  return Position(position.offset + offset, position.relative);
+}
+
+Position operator-(const Position& position, const Offset& offset) {
+  return Position(position.offset - offset, position.relative);
+}
 
 class Pen {
 public:
@@ -304,7 +371,7 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& DrawLegend(Position position = Position::NorthEast) {
+  Subtype& DrawLegend(const Position& position = {}) {
     if (metadata_.size() == 0) return static_cast<Subtype&>(*this);
 
     int text_width =
@@ -315,9 +382,10 @@ public:
     const int box_width = text_width + 6;
     const int box_height = metadata_.size() + 2;
 
-    auto locs = CalcBoxLocation(position, box_width, box_height);
-    const int loc_x = locs.first;
-    const int loc_y = locs.second;
+    auto box_rel_pos = CalcBoxPosition(position, box_width, box_height);
+    auto box_abs_pos = GetAbsolutePosition(box_rel_pos);
+    const int pos_col = box_abs_pos.offset.GetCol();
+    const int pos_row = box_abs_pos.offset.GetRow();
 
     // Setting up Cells
     auto cell_bottom = Cell{}.SetValue(Pen("_"), CellStatus::Line);
@@ -326,19 +394,19 @@ public:
     auto cell_right = Cell{}.SetValue(Pen("|"), CellStatus::Line);
 
     // Drawing box borders
-    for (int i = loc_x; i < loc_x + box_width; ++i) {
-      at(i, loc_y) = cell_bottom;                 // Bottom
-      at(i, loc_y + box_height - 1) = cell_top;   // Top
+    for (int i = pos_col; i < pos_col + box_width; ++i) {
+      at(i, pos_row) = cell_bottom;                 // Bottom
+      at(i, pos_row + box_height - 1) = cell_top;   // Top
     }
-    for (int j = loc_y; j < loc_y + box_height - 1; ++j) {
-      at(loc_x, j) = cell_left;                    // Left
-      at(loc_x + box_width - 1, j) = cell_right;   // Right
+    for (int j = pos_row; j < pos_row + box_height - 1; ++j) {
+      at(pos_col, j) = cell_left;                    // Left
+      at(pos_col + box_width - 1, j) = cell_right;   // Right
     }
 
     // Writing labels
     for (std::size_t i = 0; i < metadata_.size(); ++i) {
       DrawText(metadata_[i].pen.GetLine() + " " + metadata_[i].label,
-               loc_x + 2, loc_y + box_height - 2 - i
+               Position(pos_col + 2, pos_row + box_height - 2 - i)
       );
     }
     return static_cast<Subtype&>(*this);
@@ -431,21 +499,28 @@ public:
     return DrawPoints(x, y, std::numeric_limits<std::size_t>::max());
   }
 
-  Subtype& DrawText(const std::string& text, int col, int row) {
-    int n = std::min(width_ - col, static_cast<int>(text.size()));
-    for (int i = 0; i < n; ++i) {
-      at(i + col, row).SetValue(Pen(&text[i]), CellStatus::Line);
+  Subtype& DrawText(const std::string& text, const Position& position, bool adjust = false) {
+    auto pos_abs = GetAbsolutePosition(position);
+
+    if (adjust) {
+      int new_col = std::min<int>(pos_abs.offset.GetCol(), width_ - text.size());
+      pos_abs.offset.SetCol(new_col);
+    }
+
+    const int col = pos_abs.offset.GetCol();
+    const int row = pos_abs.offset.GetRow();
+
+    if (row < height_) {
+      int n = std::min(width_ - col, static_cast<int>(text.size()));
+      for (int i = 0; i < n; ++i) {
+        at(i + col, row).SetValue(Pen(&text[i]), CellStatus::Line);
+      }
     }
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& DrawText(const std::string& text, Position position) {
-    auto locs = CalcBoxLocation(position, text.size(), 1);
-    return DrawText(text, locs.first, locs.second);
-  }
-
   Subtype& DrawTitle() {
-    return DrawText(title_, width_ / 2 - title_.size() / 2, height_ - 1);
+    return DrawText(title_, North - Offset(title_.size() / 2, 0), true);
   }
 
   Subtype& Fill(const Pen& pen) {
@@ -512,6 +587,30 @@ public:
   }
 
   // Getters
+
+  Position GetAbsolutePosition(const Position& position) {
+    switch (position.relative) {
+    case North:
+      return Position(position.offset + Offset(width_ / 2, height_ - 1), SouthWest);
+    case NorthEast:
+      return Position(position.offset + Offset(width_ - 1, height_ - 1), SouthWest);
+    case East:
+      return Position(position.offset + Offset(width_ - 1, height_ / 2), SouthWest);
+    case SouthEast:
+      return Position(position.offset + Offset(width_ - 1, 0), SouthWest);
+    case South:
+      return Position(position.offset + Offset(width_ / 2, 0), SouthWest);
+    default:
+    case SouthWest:
+      return Position(position.offset + Offset(0, 0), SouthWest);
+    case West:
+      return Position(position.offset + Offset(0, height_ / 2), SouthWest);
+    case NorthWest:
+      return Position(position.offset + Offset(0, height_ - 1), SouthWest);
+    case Center:
+      return Position(position.offset + Offset(width_  / 2, height_ / 2), SouthWest);
+    }
+  }
 
   std::string GetName() const { return name_; }
   std::string GetTitle() const { return title_; }
@@ -586,45 +685,27 @@ public:
   }
 
 protected:
-  std::string name_;
-  std::string title_;
-  int height_;
-  int width_;
-  Pen pen_;
-  Borders autolimit_;
-  double xlim_margin_;
-  double xlim_left_;
-  double xlim_right_;
-  double ylim_margin_;
-  double ylim_bottom_;
-  double ylim_top_;
-  std::vector<Cell> canvas_;
-  std::vector<PlotMetadata> metadata_;
-  
-private:
-  std::pair<int, int> CalcBoxLocation(Position pos, int box_width, int box_height) {
-    switch (pos) {
-    case Position::North:
-      return std::pair<int, int>(width_ / 2 - box_width / 2, height_ - box_height - 1);
+  Position CalcBoxPosition(const Position& position, int box_width, int box_height) {
+    switch (position.relative) {
+    case North:
+      return position - Offset(box_width / 2, box_height);
     default:
-    case Position::NorthEast:
-      return std::pair<int, int>(width_ - box_width - 2, height_ - box_height - 1);
-    case Position::East:
-      return std::pair<int, int>(width_ - box_width - 2, height_ / 2 - box_height / 2);
-    case Position::SouthEast:
-      return std::pair<int, int>(width_ - box_width - 2, 1);
-    case Position::South:
-      return std::pair<int, int>(width_ / 2 - box_width / 2, 1);
-    case Position::SouthWest:
-      return std::pair<int, int>(2, 1);
-    case Position::West:
-      return std::pair<int, int>(2, height_ / 2 - box_height / 2);
-    case Position::NorthWest:
-      return std::pair<int, int>(2, height_ - box_height - 1);
-    case Position::Center:
-      return std::pair<int, int>(width_  / 2 - box_width  / 2,
-                                 height_ / 2 - box_height / 2
-      );
+    case NorthEast:
+      return position - Offset(box_width, box_height);
+    case East:
+      return position - Offset(box_width, box_height / 2);
+    case SouthEast:
+      return position - Offset(box_width, 0);
+    case South:
+      return position - Offset(box_width / 2, 0);
+    case SouthWest:
+      return position - Offset(0, 0);
+    case West:
+      return position - Offset(0, box_height / 2);
+    case NorthWest:
+      return position - Offset(0, box_height);
+    case Center:
+      return position - Offset(box_width  / 2, box_height / 2);
     }
   }
 
@@ -670,6 +751,21 @@ private:
       ylim_top_ += y_margin_surplus();
     }
   }
+
+  std::string name_;
+  std::string title_;
+  int height_;
+  int width_;
+  Pen pen_;
+  Borders autolimit_;
+  double xlim_margin_;
+  double xlim_left_;
+  double xlim_right_;
+  double ylim_margin_;
+  double ylim_bottom_;
+  double ylim_top_;
+  std::vector<Cell> canvas_;
+  std::vector<PlotMetadata> metadata_;
 };
 
 template<class Subtype>

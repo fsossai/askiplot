@@ -32,37 +32,15 @@
 
 namespace askiplot {
 
+//******************************** Constants ********************************//
+
 const std::string kDefaultPenLine = "=";
 const std::string kDefaultPenArea = "#";
 const std::string kDefaultPenEmpty = " ";
 const int kConsoleHeight = 0;
 const int kConsoleWidth = 0;
 
-enum class CellStatus : uint16_t { Line, Empty, Area };
-
-enum Borders : char {
-  None = 0x00, Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08, All = 0x0F
-};
-
-enum RelativePosition : char {
-  North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
-};
-
-Borders operator+(const Borders& a, const Borders& b) {
-  return static_cast<Borders>(static_cast<char>(a) | static_cast<char>(b));
-}
-
-Borders operator-(const Borders& a, const Borders& b) {
-  return static_cast<Borders>(static_cast<char>(a) & (~static_cast<char>(b)));
-}
-
-Borders operator&(const Borders& a, const Borders& b) {
-  return static_cast<Borders>(static_cast<char>(a) & static_cast<char>(b));
-}
-
-Borders operator|(const Borders& a, const Borders& b) {
-  return a + b;
-}
+//******************************* Exceptions ********************************//
 
 class InvalidPlotSize : public std::exception {
 public:
@@ -86,6 +64,20 @@ public:
       "and cannot be 0x00 (string termination character).";
   }
 };
+
+//******************************* Enumerators *******************************//
+
+enum class CellStatus : uint16_t { Line, Empty, Area };
+
+enum Borders : char {
+  None = 0x00, Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08, All = 0x0F
+};
+
+enum RelativePosition : char {
+  North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
+};
+
+//**************************** Offset & Position ****************************//
 
 class Offset {
 public:
@@ -129,10 +121,22 @@ struct Position {
   RelativePosition relative;
 };
 
+//******************************** Operators ********************************//
 
+Borders operator+(const Borders& a, const Borders& b) {
+  return static_cast<Borders>(static_cast<char>(a) | static_cast<char>(b));
+}
 
-double operator ""_percent(long double p) {
-  return p / 100.0;
+Borders operator-(const Borders& a, const Borders& b) {
+  return static_cast<Borders>(static_cast<char>(a) & (~static_cast<char>(b)));
+}
+
+Borders operator&(const Borders& a, const Borders& b) {
+  return static_cast<Borders>(static_cast<char>(a) & static_cast<char>(b));
+}
+
+Borders operator|(const Borders& a, const Borders& b) {
+  return a + b;
 }
 
 Offset operator+(const Offset& a, const Offset& b) {
@@ -158,6 +162,12 @@ Position operator+(const Position& position, const Offset& offset) {
 Position operator-(const Position& position, const Offset& offset) {
   return Position(position.offset - offset, position.relative);
 }
+
+double operator ""_percent(long double p) {
+  return p / 100.0;
+}
+
+//*********************************** Pen ***********************************//
 
 class Pen {
 public:
@@ -235,6 +245,8 @@ private:
   std::string area_;
 };
 
+//********************************** Cell ***********************************//
+
 class Cell {
 public:
   Cell() {
@@ -291,6 +303,8 @@ private:
   CellStatus status_;
 };
 
+//****************************** PlotMetaData *******************************//
+
 struct PlotMetadata {
   PlotMetadata& SetLabel(const std::string& l) { label = l; return *this; }
   PlotMetadata& SetLength(std::size_t l) { length = l; return *this; }
@@ -301,10 +315,22 @@ struct PlotMetadata {
   std::string label = "";
 };
 
-template<class Subtype>
 class __IPlot {
 public:
-  __IPlot(std::string title = "", int height = kConsoleHeight, int width = kConsoleWidth) 
+  virtual Cell& at(int col, int row) = 0;
+  virtual const Cell& at(int col, int row) const = 0;
+protected:
+  int height_;
+  int width_;
+  std::vector<Cell> canvas_;
+};
+
+//********************************** Plot ***********************************//
+
+template<class Subtype>
+class __Plot : public __IPlot {
+public:
+  __Plot(std::string title = "", int height = kConsoleHeight, int width = kConsoleWidth) 
       : title_(title) {
     if (height < 0 || width < 0) {
       throw InvalidPlotSize();
@@ -325,13 +351,13 @@ public:
     canvas_.resize(height_ * width_);
   }
 
-  virtual ~__IPlot() = default;
+  virtual ~__Plot() = default;
 
-  virtual Cell& at(int col, int row) {
+  virtual Cell& at(int col, int row) override {
     return canvas_[row + height_*col];
   }
 
-  virtual const Cell& at(int col, int row) const {
+  virtual const Cell& at(int col, int row) const override {
     return canvas_[row + height_*col];
   }
 
@@ -793,8 +819,6 @@ protected:
 
   std::string name_;
   std::string title_;
-  int height_;
-  int width_;
   Pen pen_;
   Borders autolimit_;
   double xlim_margin_;
@@ -803,17 +827,17 @@ protected:
   double ylim_margin_;
   double ylim_bottom_;
   double ylim_top_;
-  std::vector<Cell> canvas_;
   std::vector<PlotMetadata> metadata_;
 };
 
-template<class Subtype>
-class __IHistPlot : public __IPlot<Subtype> {
-public:
-};
+class Plot : public __Plot<Plot> { };
 
-class Plot final : public __IPlot<Plot> { };
-class HistPlot final : public __IHistPlot<HistPlot> { };
+//******************************** HistPlot *********************************//
+
+template<class Subtype>
+class __HistPlot : public __Plot<Subtype> { };
+
+class HistPlot : public __Plot<HistPlot> { };
 
 } // namespace askiplot
 

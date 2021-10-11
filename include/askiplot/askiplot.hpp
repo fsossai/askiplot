@@ -830,14 +830,14 @@ protected:
   std::vector<PlotMetadata> metadata_;
 };
 
-class Plot : public __Plot<Plot> { };
+class Plot final : public __Plot<Plot> { };
 
 //******************************** HistPlot *********************************//
 
 template<class Subtype>
 class __HistPlot : public __Plot<Subtype> { };
 
-class HistPlot : public __Plot<HistPlot> { };
+class HistPlot final : public __HistPlot<HistPlot> { };
 
 } // namespace askiplot
 

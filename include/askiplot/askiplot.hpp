@@ -169,53 +169,65 @@ double operator ""_percent(long double p) {
 
 //*********************************** Pen ***********************************//
 
-class Pen {
+class PenStyle {
 public:
-  Pen() {
-    SetLine(kDefaultPenLine);
-    SetEmpty(kDefaultPenEmpty);
-    SetArea(kDefaultPenArea);
+  PenStyle() {
+    SetLineStyle(kDefaultPenLine);
+    SetEmptyStyle(kDefaultPenEmpty);
+    SetAreaStyle(kDefaultPenArea);
   }
 
-  Pen(const std::string& line) : Pen() {
-    SetLine(line);
+  PenStyle(const std::string& line) : PenStyle() {
+    SetLineStyle(line);
   }
   
-  Pen(const char *line) : Pen() {
-    SetLine(line);
+  PenStyle(const char *line) : PenStyle() {
+    SetLineStyle(line);
   }
 
-  Pen(char line) : Pen() {
-    SetLine(std::string(1, line));
+  PenStyle(char line) : PenStyle() {
+    SetLineStyle(std::string(1, line));
   }
 
-  Pen(const Pen&) = default;
-  Pen(Pen&&) = default;
-  Pen& operator=(const Pen&) = default;
-  Pen& operator=(Pen&&) = default;
-  ~Pen() = default;
+  PenStyle(const PenStyle&) = default;
+  PenStyle(PenStyle&&) = default;
+  PenStyle& operator=(const PenStyle&) = default;
+  PenStyle& operator=(PenStyle&&) = default;
+  ~PenStyle() = default;
   
   // Getters
 
-  std::string GetLine() const { return line_; }
-  std::string GetEmpty() const { return empty_; }
-  std::string GetArea() const { return area_; }
+  std::string GetLineStyle() const { return line_; }
+  std::string GetEmptyStyle() const { return empty_; }
+  std::string GetAreaStyle() const { return area_; }
 
   // Setters
 
-  Pen& SetLine(const std::string& line) {
+  PenStyle& SetLineStyle(const std::string& line) {
     line_ = CheckAndReformat(line.size() == 0 ? kDefaultPenLine : line);
     return *this;
   }
 
-  Pen& SetEmpty(const std::string& empty) {
+  PenStyle& SetLineStyle(char line) {
+    return SetLineStyle(std::string(1, line));
+  }
+
+  PenStyle& SetEmptyStyle(const std::string& empty) {
     empty_ = CheckAndReformat(empty.size() == 0 ? kDefaultPenEmpty : empty);
     return *this;
   }
 
-  Pen& SetArea(const std::string& area) {
+  PenStyle& SetEmptyStyle(char empty) {
+    return SetEmptyStyle(std::string(1, empty));
+  }
+
+  PenStyle& SetAreaStyle(const std::string& area) {
     area_ = CheckAndReformat(area.size() == 0 ? kDefaultPenArea : area);
     return *this;
+  }
+
+  PenStyle& SetAreaStyle(char area) {
+    return SetAreaStyle(std::string(1, area));
   }
 
 private:
@@ -262,23 +274,23 @@ public:
     return std::string(value_, 2);
   }
 
-  Cell& SetValue(const Pen& pen, const CellStatus& status) {
+  Cell& SetValue(const PenStyle& pen, const CellStatus& status) {
     status_ = status;
     switch (status) { 
     case CellStatus::Line:
-      SetValueRaw(pen.GetLine());
+      SetValueRaw(pen.GetLineStyle());
       break;
     case CellStatus::Empty:
-      SetValueRaw(pen.GetEmpty());
+      SetValueRaw(pen.GetEmptyStyle());
       break;
     case CellStatus::Area:
-      SetValueRaw(pen.GetArea());
+      SetValueRaw(pen.GetAreaStyle());
       break;
     }
     return *this;
   }
 
-  Cell& SetValue(const Pen& pen) {
+  Cell& SetValue(const PenStyle& pen) {
     SetValue(pen, status_);
     return *this;
   }
@@ -304,9 +316,9 @@ private:
 struct PlotMetadata {
   PlotMetadata& SetLabel(const std::string& l) { label = l; return *this; }
   PlotMetadata& SetLength(std::size_t l) { length = l; return *this; }
-  PlotMetadata& SetPen(const Pen& p) { pen = p; return *this; }
+  PlotMetadata& SetPenStyle(const PenStyle& p) { penstyle = p; return *this; }
   
-  Pen pen;
+  PenStyle penstyle;
   std::size_t length = 0;
   std::string label = "";
 };
@@ -366,13 +378,13 @@ public:
   }
 
   Subtype& Clear() {
-    auto cell_empty = Cell{}.SetValue(pen_, CellStatus::Empty);
+    auto cell_empty = Cell{}.SetValue(penstyle_, CellStatus::Empty);
     std::fill(canvas_.begin(), canvas_.end(), cell_empty);
     return static_cast<Subtype&>(*this);
   }
 
   Subtype& DrawBorders(Borders borders) {
-    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+    const auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
     if (borders & Borders::Left) {
       for (int j = 0; j < height_; ++j) {
         at(0, j) = cell_line;
@@ -413,10 +425,10 @@ public:
     const int pos_row = box_abs_pos.offset.GetRow();
 
     // Setting up Cells
-    auto cell_bottom = Cell{}.SetValue(Pen("_"), CellStatus::Line);
-    auto cell_top = Cell{}.SetValue(Pen("_"), CellStatus::Line);
-    auto cell_left = Cell{}.SetValue(Pen("|"), CellStatus::Line);
-    auto cell_right = Cell{}.SetValue(Pen("|"), CellStatus::Line);
+    auto cell_bottom = Cell{}.SetValue(PenStyle("_"), CellStatus::Line);
+    auto cell_top = Cell{}.SetValue(PenStyle("_"), CellStatus::Line);
+    auto cell_left = Cell{}.SetValue(PenStyle("|"), CellStatus::Line);
+    auto cell_right = Cell{}.SetValue(PenStyle("|"), CellStatus::Line);
 
     // Drawing box borders
     for (int i = pos_col; i < pos_col + box_width; ++i) {
@@ -430,7 +442,7 @@ public:
 
     // Writing labels
     for (std::size_t i = 0; i < metadata_.size(); ++i) {
-      DrawText(metadata_[i].pen.GetLine() + " " + metadata_[i].label,
+      DrawText(metadata_[i].penstyle.GetLineStyle() + " " + metadata_[i].label,
                Position(pos_col + 2, pos_row + box_height - 2 - i)
       );
     }
@@ -438,7 +450,7 @@ public:
   }
 
   Subtype& DrawLine(double x_begin, double y_begin, double x_end, double y_end) {
-    auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+    auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
 
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
@@ -493,7 +505,7 @@ public:
 
   Subtype& DrawLineHorizontalAtRow(int row) {
     if (row < height_) {
-      auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+      auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
       for (int i = 0; i < width_; ++i) {
         at(i, row) = cell_line;
       }
@@ -508,7 +520,7 @@ public:
 
   Subtype& DrawLineVerticalAtCol(int col) {
     if (col < width_) {
-      auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+      auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
       for (int j = 0; j < height_; ++j) {
         at(col, j) = cell_line;
       }
@@ -545,7 +557,7 @@ public:
       const double ystep = (ylim_top_ - ylim_bottom_) / height_;
       at(static_cast<int>((x - xlim_left_  ) / xstep),
          static_cast<int>((y - ylim_bottom_) / ystep))
-        .SetValue(pen_, CellStatus::Line);
+        .SetValue(penstyle_, CellStatus::Line);
     }
     return static_cast<Subtype&>(*this);
   }
@@ -560,7 +572,7 @@ public:
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
     
     const std::size_t n = std::min({x.size(), y.size(), how_many});
-    const auto cell_line = Cell{}.SetValue(pen_, CellStatus::Line);
+    const auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
 
     for (std::size_t i = 0; i < n; ++i) {
       if (xlim_left_   < x[i] && x[i] < xlim_right_ &&
@@ -593,7 +605,7 @@ public:
     if (row < height_) {
       int n = std::min(width_ - col, static_cast<int>(text.size()));
       for (int i = 0; i < n; ++i) {
-        at(i + col, row).SetValue(Pen(&text[i]), CellStatus::Line);
+        at(i + col, row).SetValue(PenStyle(&text[i]), CellStatus::Line);
       }
     }
     return static_cast<Subtype&>(*this);
@@ -607,14 +619,14 @@ public:
     return DrawTextCentered(title_, North, false);
   }
 
-  Subtype& Fill(const Pen& pen) {
+  Subtype& Fill(const PenStyle& pen) {
     auto cell_new = Cell{}.SetValue(pen, CellStatus::Line);
     std::fill(canvas_.begin(), canvas_.end(), cell_new);
     return static_cast<Subtype&>(*this);
   }
 
   Subtype& Fill() {
-    return Fill(pen_);
+    return Fill(penstyle_);
   }
 
   template<class Tx, class Ty>
@@ -626,7 +638,7 @@ public:
     metadata_.push_back(
       PlotMetadata{}.SetLabel(label)
                     .SetLength(how_many)
-                    .SetPen(pen_)
+                    .SetPenStyle(penstyle_)
     );
     return static_cast<Subtype&>(*this);
   }
@@ -683,8 +695,8 @@ public:
   double GetXlimRight() const { return xlim_right_; }
   double GetYlimBottom() const { return ylim_bottom_; }
   double GetYlimTop() const { return ylim_top_; }
-  Pen& GetPen() { return pen_; }
-  const Pen& GetPen() const { return pen_; }
+  PenStyle& GetPenStyle() { return penstyle_; }
+  const PenStyle& GetPenStyle() const { return penstyle_; }
 
   // Setters
 
@@ -698,8 +710,8 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& SetPen(const Pen &pen) {
-    pen_ = pen;
+  Subtype& SetPenStyle(const PenStyle &pen) {
+    penstyle_ = pen;
     return static_cast<Subtype&>(*this);
   }
 
@@ -817,7 +829,7 @@ protected:
 
   std::string name_;
   std::string title_;
-  Pen pen_;
+  PenStyle penstyle_;
   Borders autolimit_;
   double xlim_margin_;
   double xlim_left_;

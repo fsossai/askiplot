@@ -315,6 +315,7 @@ class __IPlot {
 public:
   virtual Cell& at(int col, int row) = 0;
   virtual const Cell& at(int col, int row) const = 0;
+  virtual std::string Serialize() const = 0;
 protected:
   int height_;
   int width_;
@@ -326,16 +327,18 @@ protected:
 template<class Subtype>
 class __Plot : public __IPlot {
 public:
-  __Plot(std::string title = "", int height = kConsoleHeight, int width = kConsoleWidth) 
-      : title_(title) {
-    if (height < 0 || width < 0) {
+  __Plot(int width = kConsoleWidth, int height = kConsoleHeight) {
+    if (width < 0 || height < 0) {
       throw InvalidPlotSize();
     }
-    if (height == kConsoleHeight || width == kConsoleWidth) {
+    if (width == kConsoleWidth || height == kConsoleHeight) {
       struct winsize w;
       ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      if (height == kConsoleHeight) height_ = w.ws_row - 1;
       if (width == kConsoleWidth) width_ = w.ws_col;
+      if (height == kConsoleHeight) height_ = w.ws_row - 1;
+    } else {
+      width_ = width;
+      height_ = height;
     }
     autolimit_ = Borders::All;
     xlim_margin_ = 0.05;
@@ -611,8 +614,7 @@ public:
   }
 
   Subtype& Fill() {
-    Fill(pen_);
-    return static_cast<Subtype&>(*this);
+    return Fill(pen_);
   }
 
   template<class Tx, class Ty>
@@ -636,7 +638,7 @@ public:
     return PlotData(x, y, label, std::numeric_limits<std::size_t>::max());
   }
 
-  std::string Serialize() const {
+  std::string Serialize() const override {
     std::stringstream ss("");
     for (int j = height_ - 1; j >= 0; --j) {
       for (int i = 0; i < width_; ++i) {
@@ -773,10 +775,10 @@ protected:
   template<class Tx, class Ty>
   void SetAutoLimits(const std::vector<Tx>& x,
                      const std::vector<Ty>& y) {
-    // Left and Right
     auto x_margin_surplus = [this](){ return std::abs((xlim_right_ - xlim_left_) * xlim_margin_); };
     auto y_margin_surplus = [this](){ return std::abs((ylim_top_ - ylim_bottom_) * ylim_margin_); };
     
+    // Left and Right
     if (autolimit_ & Borders::Left) {
       if (autolimit_ & Borders::Right) {
         auto mm = std::minmax_element(x.begin(), x.end());
@@ -826,14 +828,26 @@ protected:
   std::vector<PlotMetadata> metadata_;
 };
 
-class Plot final : public __Plot<Plot> { };
+class Plot final : public __Plot<Plot> { using __Plot::__Plot; };
 
 //******************************** HistPlot *********************************//
 
 template<class Subtype>
-class __HistPlot : public __Plot<Subtype> { };
+class __HistPlot : public __Plot<Subtype> { 
+public:
+  __HistPlot(int width = kConsoleWidth, int height = kConsoleHeight)
+        : __Plot<Subtype>(width, height) { }
+};
 
-class HistPlot final : public __HistPlot<HistPlot> { };
+class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlot; };
+
+//***************************** Free functions ******************************//
+
+template<class T>
+T EmptyLike(const T& plot) {
+  static_assert(std::is_base_of<__Plot<T>, T>::value, "Template type T must be a subtype of __Plot<T>.");
+  return T(plot.GetWidth(), plot.GetHeight());
+}
 
 } // namespace askiplot
 

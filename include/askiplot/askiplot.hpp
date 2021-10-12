@@ -177,20 +177,16 @@ public:
     SetArea(kDefaultPenArea);
   }
 
-  Pen(const std::string& line,
-      const std::string& empty = kDefaultPenEmpty,
-      const std::string& area = kDefaultPenArea) {
+  Pen(const std::string& line) : Pen() {
     SetLine(line);
-    SetEmpty(empty);
-    SetArea(area);
   }
   
-  Pen(const char *line,
-      const char *empty = kDefaultPenEmpty.data(),
-      const char *area = kDefaultPenArea.data()) {
+  Pen(const char *line) : Pen() {
     SetLine(line);
-    SetEmpty(empty);
-    SetArea(area);
+  }
+
+  Pen(char line) : Pen() {
+    SetLine(std::string(1, line));
   }
 
   Pen(const Pen&) = default;

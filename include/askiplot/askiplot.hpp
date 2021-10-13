@@ -327,21 +327,27 @@ struct PlotMetadata {
   std::string label = "";
 };
 
-class __IPlot {
+class IPlot {
 public:
   virtual Cell& at(int col, int row) = 0;
   virtual const Cell& at(int col, int row) const = 0;
   virtual std::string Serialize() const = 0;
+  virtual int GetWidth() const = 0;
+  virtual int GetHeight() const = 0;
 protected:
-  int height_;
   int width_;
+  int height_;
   std::vector<Cell> canvas_;
 };
 
 //********************************** Plot ***********************************//
 
+// Forward declaration
+template<class T>
+class PlotFusion;
+
 template<class Subtype>
-class __Plot : public __IPlot {
+class __Plot : public IPlot {
 public:
   __Plot(int width = kConsoleWidth, int height = kConsoleHeight) {
     if (width < 0 || height < 0) {
@@ -367,6 +373,30 @@ public:
   }
 
   virtual ~__Plot() = default;
+
+  void AdjustAbsolutePosition(Position& position,
+                              int box_width,
+                              int box_height,
+                              bool drawing_upwards) const {
+    if (!position.IsAbsolute()) {
+      position = GetAbsolutePosition(position);
+    }
+
+    int new_col = std::max(0, position.offset.GetCol());
+    int new_row = std::min(height_ - 1, position.offset.GetRow());
+    int free_cols = width_ - new_col;
+    int free_rows = drawing_upwards ? (height_ - new_row) : (new_row + 1);
+
+    if (free_cols < box_width) {
+      new_col = std::max(0, width_ - box_width);
+    }
+    if (free_rows < box_height) {
+      new_row = drawing_upwards ? std::max(0, height_ - box_height)
+                                : std::min(height_ - 1, box_height - 1);
+    }
+    
+    position.offset = Offset(new_col, new_row);
+  }
 
   virtual Cell& at(int col, int row) override {
     return canvas_[row + height_*col];
@@ -600,7 +630,7 @@ public:
     auto pos_abs = GetAbsolutePosition(position);
 
     if (adjust) {
-      AdjustAbsolutePosition(pos_abs, text.size(), 1);
+      AdjustAbsolutePosition(pos_abs, text.size(), 1, false);
     }
 
     const int col = pos_abs.offset.GetCol();
@@ -627,7 +657,7 @@ public:
     auto pos_abs = GetAbsolutePosition(position);
 
     if (adjust) {
-      AdjustAbsolutePosition(pos_abs, 1, text.size());
+      AdjustAbsolutePosition(pos_abs, 1, text.size(), false);
     }
 
     const int col = pos_abs.offset.GetCol();
@@ -654,6 +684,14 @@ public:
 
   Subtype& Fill() {
     return Fill(penstyle_);
+  }
+
+  PlotFusion<Subtype> Fusion() {
+    return PlotFusion<Subtype>(static_cast<Subtype&>(*this));
+  }
+
+  bool IsLike(const IPlot& other) const {
+    return (width_ == other.GetWidth() && height_ == other.GetHeight());
   }
 
   Subtype& Move(const Offset& offset) {
@@ -741,8 +779,8 @@ public:
 
   std::string GetName() const { return name_; }
   std::string GetTitle() const { return title_; }
-  int GetWidth() const { return width_; }
-  int GetHeight() const { return height_; }
+  int GetWidth() const override { return width_; }
+  int GetHeight() const override { return height_; }
   double GetXlimLeft() const { return xlim_left_; }
   double GetXlimRight() const { return xlim_right_; }
   double GetYlimBottom() const { return ylim_bottom_; }
@@ -836,37 +874,6 @@ protected:
     }
   }
 
-  void AdjustAbsolutePosition2(Position& position, int box_width, int box_height) const {
-    if (!position.IsAbsolute()) {
-      position = GetAbsolutePosition(position);
-    }
-    int new_col = std::min<int>(position.offset.GetCol(), width_ - box_width);
-    int new_row = std::min<int>(position.offset.GetRow(), height_ - 1);
-    new_col = std::max(new_col, 0);
-    new_row = std::max(new_row, box_height - 1);
-    position.offset = Offset(new_col, new_row);
-  }
-
-  void AdjustAbsolutePosition(Position& position, int box_width, int box_height) const {
-    if (!position.IsAbsolute()) {
-      position = GetAbsolutePosition(position);
-    }
-    
-    int new_col = std::max(0, position.offset.GetCol());
-    int new_row = std::min(height_ - 1, position.offset.GetRow());
-    int free_cols = width_ - new_col;
-    int free_rows = new_row + 1;
-    
-    if (free_cols < box_width) {
-      new_col = std::max(0, width_ - box_width);
-    }
-    if (free_rows < box_height) {
-      new_row = std::min(height_ - 1, box_height - 1);
-    }
-    
-    position.offset = Offset(new_col, new_row);
-  }
-
   template<class Tx, class Ty>
   void SetAutoLimits(const std::vector<Tx>& x,
                      const std::vector<Ty>& y) {
@@ -924,6 +931,56 @@ protected:
 };
 
 class Plot final : public __Plot<Plot> { using __Plot::__Plot; };
+
+//******************************* PlotFusion ********************************//
+
+template<class T>
+class PlotFusion {
+public:
+  PlotFusion(T& baseplot)
+      : baseplot_(baseplot) {
+    static_assert(std::is_base_of<__Plot<T>, T>::value, "Template type T must be a subtype of __Plot<T>.");
+  }
+
+  template<class U>
+  PlotFusion& operator()(const U& other,
+                         const Position& position = SouthWest,
+                         AdjustPosition adjust = Adjust) {
+    auto pos_abs = baseplot_.GetAbsolutePosition(position);
+    if (adjust) {
+      baseplot_.AdjustAbsolutePosition(pos_abs, other.GetWidth(), other.GetHeight(), true);
+    }
+    plots_offsets_.push_back({&other, pos_abs.offset});
+    return *this;
+  }
+
+  T& Fuse() {
+    const int base_width = baseplot_.GetWidth();
+    const int base_height = baseplot_.GetHeight();
+    for (const auto& po : plots_offsets_) {
+      const auto plot = std::get<const IPlot*>(po);
+      const auto offset = std::get<Offset>(po);
+
+      const int off_c = offset.GetCol();
+      const int off_r = offset.GetRow();
+      const int col_beg = std::max(0, -off_c);
+      const int col_end = std::min(plot->GetWidth(), base_width - off_c);
+      const int row_beg = std::max(0, -off_r);
+      const int row_end = std::min(plot->GetHeight(), base_height - off_r);
+
+      for (int i = col_beg; i < col_end; ++i) {
+        for (int j = row_beg; j < row_end; ++j) {
+          baseplot_.at(i + off_c, j + off_r) = plot->at(i, j);
+        }
+      }
+    }
+    return baseplot_;
+  }
+
+private:
+  T& baseplot_;
+  std::vector<std::pair<const IPlot*, Offset>> plots_offsets_;
+};
 
 //******************************** HistPlot *********************************//
 

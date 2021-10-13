@@ -77,6 +77,10 @@ enum RelativePosition : char {
   North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest, Center
 };
 
+enum AdjustPosition : bool {
+  Adjust = true, DontAdjust = false
+};
+
 //**************************** Offset & Position ****************************//
 
 class Offset {
@@ -590,20 +594,20 @@ public:
     return DrawPoints(x, y, std::numeric_limits<std::size_t>::max());
   }
 
-  Subtype& DrawText(const std::string& text, const Position& position, bool adjust = false) {
+  Subtype& DrawText(const std::string& text,
+                    const Position& position,
+                    AdjustPosition adjust = Adjust) {
     auto pos_abs = GetAbsolutePosition(position);
 
     if (adjust) {
-      int new_col = std::min<int>(pos_abs.offset.GetCol(), width_ - text.size());
-      int new_row = std::min<int>(pos_abs.offset.GetRow(), height_ - 1);
-      pos_abs.offset = Offset(new_col, new_row);
+      AdjustAbsolutePosition(pos_abs, text.size(), 1);
     }
 
     const int col = pos_abs.offset.GetCol();
     const int row = pos_abs.offset.GetRow();
 
-    if (row < height_) {
-      int n = std::min(width_ - col, static_cast<int>(text.size()));
+    if (0 <= row && row < height_) {
+      int n = std::min<int>(width_ - col, text.size());
       for (int i = 0; i < n; ++i) {
         at(i + col, row).SetValue(PenStyle(&text[i]), CellStatus::Line);
       }
@@ -611,12 +615,35 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& DrawTextCentered(const std::string& text, const Position& position, bool adjust = false) {
+  Subtype& DrawTextCentered(const std::string& text,
+                            const Position& position,
+                            AdjustPosition adjust = Adjust) {
     return DrawText(text, position - Offset(text.size() / 2, 0), adjust);
   }
 
+  Subtype& DrawTextVertical(const std::string& text,
+                            const Position& position,
+                            AdjustPosition adjust = Adjust) {
+    auto pos_abs = GetAbsolutePosition(position);
+
+    if (adjust) {
+      AdjustAbsolutePosition(pos_abs, 1, text.size());
+    }
+
+    const int col = pos_abs.offset.GetCol();
+    const int row = pos_abs.offset.GetRow();
+
+    if (0 <= col && col < width_) {
+      int n = std::min<int>(row + 1, text.size());
+      for (int j = 0; j < n; ++j) {
+        at(col, row - j).SetValue(PenStyle(&text[j]), CellStatus::Line);
+      }
+    } else { std::cout << col << "\t" << row << std::endl; }
+    return static_cast<Subtype&>(*this);
+  }
+
   Subtype& DrawTitle() {
-    return DrawTextCentered(title_, North, false);
+    return DrawTextCentered(title_, North, DontAdjust);
   }
 
   Subtype& Fill(const PenStyle& pen) {
@@ -627,6 +654,31 @@ public:
 
   Subtype& Fill() {
     return Fill(penstyle_);
+  }
+
+  Subtype& Move(const Offset& offset) {
+    std::vector<Cell> new_canvas(canvas_.size());
+    std::fill(new_canvas.begin(), new_canvas.end(),
+              Cell{}.SetValue(penstyle_.GetEmptyStyle()));
+
+    const int off_c = offset.GetCol();
+    const int off_r = offset.GetRow();
+    auto dest_idx = [=](int col, int row) {
+      return (row + off_r) + height_ * (col + off_c);
+    };
+
+    const int col_beg = std::max(0, -off_c);
+    const int col_end = std::min(width_, width_ - off_c);
+    const int row_beg = std::max(0, -off_r);
+    const int row_end = std::min(height_, height_ - off_r);
+
+    for (int i = col_beg; i < col_end; ++i) {
+      for (int j = row_beg; j < row_end; ++j) {
+        new_canvas[dest_idx(i, j)] = at(i,j);
+      }
+    }
+    canvas_ = move(new_canvas);
+    return static_cast<Subtype&>(*this);
   }
 
   template<class Tx, class Ty>
@@ -663,7 +715,7 @@ public:
 
   // Getters
 
-  Position GetAbsolutePosition(const Position& position) {
+  Position GetAbsolutePosition(const Position& position) const {
     switch (position.relative) {
     case North:
       return Position(position.offset + Offset(width_ / 2, height_ - 1), SouthWest);
@@ -782,6 +834,37 @@ protected:
     case Center:
       return position - Offset(box_width  / 2, box_height / 2);
     }
+  }
+
+  void AdjustAbsolutePosition2(Position& position, int box_width, int box_height) const {
+    if (!position.IsAbsolute()) {
+      position = GetAbsolutePosition(position);
+    }
+    int new_col = std::min<int>(position.offset.GetCol(), width_ - box_width);
+    int new_row = std::min<int>(position.offset.GetRow(), height_ - 1);
+    new_col = std::max(new_col, 0);
+    new_row = std::max(new_row, box_height - 1);
+    position.offset = Offset(new_col, new_row);
+  }
+
+  void AdjustAbsolutePosition(Position& position, int box_width, int box_height) const {
+    if (!position.IsAbsolute()) {
+      position = GetAbsolutePosition(position);
+    }
+    
+    int new_col = std::max(0, position.offset.GetCol());
+    int new_row = std::min(height_ - 1, position.offset.GetRow());
+    int free_cols = width_ - new_col;
+    int free_rows = new_row + 1;
+    
+    if (free_cols < box_width) {
+      new_col = std::max(0, width_ - box_width);
+    }
+    if (free_rows < box_height) {
+      new_row = std::min(height_ - 1, box_height - 1);
+    }
+    
+    position.offset = Offset(new_col, new_row);
   }
 
   template<class Tx, class Ty>

@@ -89,6 +89,8 @@ enum BlankFusion : bool {
 
 //**************************** Offset & Position ****************************//
 
+using offset_t = std::pair<int, int>;
+
 class Offset {
 public:
   Offset()
@@ -99,7 +101,7 @@ public:
       : col_(col)
       , row_(row) { }
 
-  Offset(const std::pair<int, int>& cr_pair)
+  Offset(const offset_t& cr_pair)
       : col_(cr_pair.first)
       , row_(cr_pair.second) { }
 
@@ -123,6 +125,10 @@ struct Position {
 
   Position(const RelativePosition& relative = SouthWest)
       : offset(0, 0)
+      , relative(relative) { }
+
+  Position(const offset_t& pair, const RelativePosition& relative = SouthWest)
+      : offset(pair)
       , relative(relative) { }
 
   bool IsAbsolute() const { return relative == SouthWest; }
@@ -153,6 +159,10 @@ Offset operator+(const Offset& a, const Offset& b) {
   return Offset(a.GetCol() + b.GetCol(), a.GetRow() + b.GetRow());
 }
 
+Offset operator-(const Offset& a) {
+  return Offset(-a.GetCol(), -a.GetRow());
+}
+
 Offset operator-(const Offset& a, const Offset& b) {
   return Offset(a.GetCol() - b.GetCol(), a.GetRow() - b.GetRow());
 }
@@ -171,6 +181,22 @@ Position operator+(const Position& position, const Offset& offset) {
 
 Position operator-(const Position& position, const Offset& offset) {
   return Position(position.offset - offset, position.relative);
+}
+
+Position operator+(const RelativePosition& relative, const offset_t& offset) {
+  return Position(Offset(offset), relative);
+}
+
+Position operator+(const offset_t& offset, const RelativePosition& relative) {
+  return Position(Offset(offset), relative);
+}
+
+Position operator+(const Position& position, const offset_t& offset) {
+  return Position(position.offset + Offset(offset), position.relative);
+}
+
+Position operator-(const Position& position, const offset_t& offset) {
+  return Position(position.offset - Offset(offset), position.relative);
 }
 
 double operator ""_percent(long double p) {
@@ -698,6 +724,24 @@ public:
     return DrawTextCentered(title_, North, DontAdjust);
   }
 
+  Subtype Extract(const Position& corner1, const Position& corner2) const {
+    auto pos_abs1 = GetAbsolutePosition(corner1);
+    auto pos_abs2 = GetAbsolutePosition(corner2);
+
+    const int col_beg = std::min(pos_abs1.offset.GetCol(), pos_abs2.offset.GetCol());
+    const int row_beg = std::min(pos_abs1.offset.GetRow(), pos_abs2.offset.GetRow());
+    const int w = std::abs(pos_abs2.offset.GetCol() - pos_abs1.offset.GetCol()) + 1;
+    const int h = std::abs(pos_abs2.offset.GetRow() - pos_abs1.offset.GetRow()) + 1;
+
+    Subtype extracted(w, h);
+    for (int i = 0; i < w; ++i) {
+      for (int j = 0; j < h; ++j) {
+        extracted.at(i, j) = this->at(i + col_beg, j + row_beg);
+      }
+    }
+    return extracted;
+  }
+
   Subtype& Fill(const PenStyle& pen) {
     auto cell_new = Cell{}.SetValue(pen, CellStatus::Line);
     std::fill(canvas_.begin(), canvas_.end(), cell_new);
@@ -717,27 +761,9 @@ public:
   }
 
   Subtype& Move(const Offset& offset) {
-    std::vector<Cell> new_canvas(canvas_.size());
-    std::fill(new_canvas.begin(), new_canvas.end(),
-              Cell{}.SetValue(penstyle_.GetBlankStyle()));
-
-    const int off_c = offset.GetCol();
-    const int off_r = offset.GetRow();
-    auto dest_idx = [=](int col, int row) {
-      return (row + off_r) + height_ * (col + off_c);
-    };
-
-    const int col_beg = std::max(0, -off_c);
-    const int col_end = std::min(width_, width_ - off_c);
-    const int row_beg = std::max(0, -off_r);
-    const int row_end = std::min(height_, height_ - off_r);
-
-    for (int i = col_beg; i < col_end; ++i) {
-      for (int j = row_beg; j < row_end; ++j) {
-        new_canvas[dest_idx(i, j)] = at(i,j);
-      }
-    }
-    canvas_ = move(new_canvas);
+    auto copy = *this;
+    Clear();
+    Fusion()(copy, offset, DontAdjust).Fuse();
     return static_cast<Subtype&>(*this);
   }
 

@@ -36,7 +36,7 @@ namespace askiplot {
 
 const std::string kDefaultPenLine = "=";
 const std::string kDefaultPenArea = "#";
-const std::string kDefaultPenEmpty = " ";
+const std::string kDefaultPenBlank = " ";
 const int kConsoleHeight = 0;
 const int kConsoleWidth = 0;
 
@@ -67,7 +67,9 @@ public:
 
 //******************************* Enumerators *******************************//
 
-enum class CellStatus : uint16_t { Line, Empty, Area };
+enum class CellStatus : uint16_t {
+  Line, Blank, Area, Text
+};
 
 enum Borders : char {
   None = 0x00, Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08, All = 0x0F
@@ -79,6 +81,10 @@ enum RelativePosition : char {
 
 enum AdjustPosition : bool {
   Adjust = true, DontAdjust = false
+};
+
+enum BlankFusion : bool {
+  KeepBlanks = true, IgnoreBlanks = false
 };
 
 //**************************** Offset & Position ****************************//
@@ -177,7 +183,7 @@ class PenStyle {
 public:
   PenStyle() {
     SetLineStyle(kDefaultPenLine);
-    SetEmptyStyle(kDefaultPenEmpty);
+    SetBlankStyle(kDefaultPenBlank);
     SetAreaStyle(kDefaultPenArea);
   }
 
@@ -202,7 +208,7 @@ public:
   // Getters
 
   std::string GetLineStyle() const { return line_; }
-  std::string GetEmptyStyle() const { return empty_; }
+  std::string GetBlankStyle() const { return blank_; }
   std::string GetAreaStyle() const { return area_; }
 
   // Setters
@@ -216,13 +222,13 @@ public:
     return SetLineStyle(std::string(1, line));
   }
 
-  PenStyle& SetEmptyStyle(const std::string& empty) {
-    empty_ = CheckAndReformat(empty.size() == 0 ? kDefaultPenEmpty : empty);
+  PenStyle& SetBlankStyle(const std::string& blank) {
+    blank_ = CheckAndReformat(blank.size() == 0 ? kDefaultPenBlank : blank);
     return *this;
   }
 
-  PenStyle& SetEmptyStyle(char empty) {
-    return SetEmptyStyle(std::string(1, empty));
+  PenStyle& SetBlankStyle(char blank) {
+    return SetBlankStyle(std::string(1, blank));
   }
 
   PenStyle& SetAreaStyle(const std::string& area) {
@@ -253,7 +259,7 @@ private:
   }
 
   std::string line_;
-  std::string empty_;
+  std::string blank_;
   std::string area_;
 };
 
@@ -262,14 +268,28 @@ private:
 class Cell {
 public:
   Cell() {
-    SetValue(kDefaultPenEmpty, CellStatus::Empty);
+    SetValue(kDefaultPenBlank, CellStatus::Blank);
   }
 
   Cell(const Cell&) = default;
+
+  Cell(char c) {
+    value_[0] = c;
+    value_[1] = '\0';
+    status_ = CellStatus::Text;
+  }
+  
   Cell(Cell&&) = default;
   Cell& operator=(const Cell&) = default;
   Cell& operator=(Cell&&) = default;
   ~Cell() = default;
+
+  bool IsArea() const { return status_ == CellStatus::Area; }
+  bool IsBlank() const { return status_ == CellStatus::Blank; }
+  bool IsLine() const { return status_ == CellStatus::Line; }
+  bool IsText() const { return status_ == CellStatus::Text; }
+
+  const CellStatus& GetStatus() const { return status_; }
 
   std::string GetValue() const {
     if (value_[1] == '\0') {
@@ -284,11 +304,13 @@ public:
     case CellStatus::Line:
       SetValueRaw(pen.GetLineStyle());
       break;
-    case CellStatus::Empty:
-      SetValueRaw(pen.GetEmptyStyle());
+    case CellStatus::Blank:
+      SetValueRaw(pen.GetBlankStyle());
       break;
     case CellStatus::Area:
       SetValueRaw(pen.GetAreaStyle());
+      break;
+    case CellStatus::Text:
       break;
     }
     return *this;
@@ -298,12 +320,6 @@ public:
     SetValue(pen, status_);
     return *this;
   }
-
-  const CellStatus& GetStatus() const { return status_; }
-
-  bool IsLine() const { return status_ == CellStatus::Line; }
-  bool IsEmpty() const { return status_ == CellStatus::Empty; }
-  bool IsArea() const { return status_ == CellStatus::Area; }
 
 private:
   void SetValueRaw(const std::string& value) {
@@ -412,8 +428,8 @@ public:
   }
 
   Subtype& Clear() {
-    auto cell_empty = Cell{}.SetValue(penstyle_, CellStatus::Empty);
-    std::fill(canvas_.begin(), canvas_.end(), cell_empty);
+    auto cell_blank = Cell{}.SetValue(penstyle_, CellStatus::Blank);
+    std::fill(canvas_.begin(), canvas_.end(), cell_blank);
     return static_cast<Subtype&>(*this);
   }
 
@@ -639,7 +655,7 @@ public:
     if (0 <= row && row < height_) {
       int n = std::min<int>(width_ - col, text.size());
       for (int i = 0; i < n; ++i) {
-        at(i + col, row).SetValue(PenStyle(&text[i]), CellStatus::Line);
+        at(i + col, row) = text[i];
       }
     }
     return static_cast<Subtype&>(*this);
@@ -672,6 +688,12 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& DrawTextVerticalCentered(const std::string& text,
+                                    const Position& position,
+                                    AdjustPosition adjust = Adjust) {
+    return DrawTextVertical(text, position + Offset(0, text.size() / 2), adjust);
+  }
+
   Subtype& DrawTitle() {
     return DrawTextCentered(title_, North, DontAdjust);
   }
@@ -697,7 +719,7 @@ public:
   Subtype& Move(const Offset& offset) {
     std::vector<Cell> new_canvas(canvas_.size());
     std::fill(new_canvas.begin(), new_canvas.end(),
-              Cell{}.SetValue(penstyle_.GetEmptyStyle()));
+              Cell{}.SetValue(penstyle_.GetBlankStyle()));
 
     const int off_c = offset.GetCol();
     const int off_r = offset.GetRow();
@@ -738,6 +760,14 @@ public:
                     const std::vector<Ty>& y,
                     const std::string& label) {
     return PlotData(x, y, label, std::numeric_limits<std::size_t>::max());
+  }
+
+  Subtype& Redraw() {
+    for (auto& cell : canvas_) {
+      cell.SetValue(penstyle_, cell.GetStatus());
+    }
+    
+    return static_cast<Subtype&>(*this);
   }
 
   std::string Serialize() const override {
@@ -954,7 +984,7 @@ public:
     return *this;
   }
 
-  T& Fuse() {
+  T& Fuse(BlankFusion keep_blanks = KeepBlanks) {
     const int base_width = baseplot_.GetWidth();
     const int base_height = baseplot_.GetHeight();
     for (const auto& po : plots_offsets_) {
@@ -968,9 +998,19 @@ public:
       const int row_beg = std::max(0, -off_r);
       const int row_end = std::min(plot->GetHeight(), base_height - off_r);
 
-      for (int i = col_beg; i < col_end; ++i) {
-        for (int j = row_beg; j < row_end; ++j) {
-          baseplot_.at(i + off_c, j + off_r) = plot->at(i, j);
+      if (keep_blanks) {
+        for (int i = col_beg; i < col_end; ++i) {
+          for (int j = row_beg; j < row_end; ++j) {
+            baseplot_.at(i + off_c, j + off_r) = plot->at(i, j);
+          }
+        }
+      } else {
+        for (int i = col_beg; i < col_end; ++i) {
+          for (int j = row_beg; j < row_end; ++j) {
+            if (!plot->at(i, j).IsBlank()) {
+              baseplot_.at(i + off_c, j + off_r) = plot->at(i, j);
+            }
+          }
         }
       }
     }
@@ -996,7 +1036,7 @@ class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlo
 //***************************** Free functions ******************************//
 
 template<class T>
-T EmptyLike(const T& plot) {
+T BlankLike(const T& plot) {
   static_assert(std::is_base_of<__Plot<T>, T>::value, "Template type T must be a subtype of __Plot<T>.");
   return T(plot.GetWidth(), plot.GetHeight());
 }

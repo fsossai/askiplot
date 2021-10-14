@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -34,9 +35,12 @@ namespace askiplot {
 
 //******************************** Constants ********************************//
 
-const std::string kDefaultPenLine = "=";
+const std::string kDefaultPenLine = "_";
 const std::string kDefaultPenArea = "#";
 const std::string kDefaultPenBlank = " ";
+const std::string kDefaultBarBorderTop = "_";
+const std::string kDefaultBarBorderLeft = "|";
+const std::string kDefaultBarBorderRight = "|";
 const int kConsoleHeight = 0;
 const int kConsoleWidth = 0;
 
@@ -86,6 +90,29 @@ enum AdjustPosition : bool {
 enum BlankFusion : bool {
   KeepBlanks = true, IgnoreBlanks = false
 };
+
+//******************** Namespace-private free functions *********************//
+
+namespace {
+
+std::string CheckAndReformat(const std::string& candidate) {
+  std::string result;
+  if (candidate.size() == 0) {
+    throw InvalidCellOrPenValue();
+  } else if (std::isprint(static_cast<unsigned char>(candidate[0]))) {
+    result.resize(1);
+    result[0] = candidate[0];
+  } else if (candidate.size() == 1) {
+    throw InvalidCellOrPenValue();
+  } else {
+    result.resize(2);
+    result[0] = candidate[0];
+    result[1] = candidate[1];
+  }
+  return result;
+}
+
+} // private namespace
 
 //**************************** Offset & Position ****************************//
 
@@ -267,26 +294,77 @@ public:
   }
 
 private:
-  std::string CheckAndReformat(const std::string& candidate) const {
-    std::string result;
-    if (candidate.size() == 0) {
-      throw InvalidCellOrPenValue();
-    } else if (std::isprint(static_cast<unsigned char>(candidate[0]))) {
-      result.resize(1);
-      result[0] = candidate[0];
-    } else if (candidate.size() == 1) {
-      throw InvalidCellOrPenValue();
-    } else {
-      result.resize(2);
-      result[0] = candidate[0];
-      result[1] = candidate[1];
-    }
-    return result;
-  }
-
   std::string line_;
   std::string blank_;
   std::string area_;
+};
+
+//******************************** BarStyle *********************************//
+
+class BarStyle {
+public:
+  BarStyle() {
+    SetBorderTop(kDefaultBarBorderTop);
+    SetBorderLeft(kDefaultBarBorderLeft);
+    SetBorderRight(kDefaultBarBorderRight);
+  }
+
+  BarStyle(const std::string& top,
+           const std::string& left,
+           const std::string& right) {
+    SetBorderTop(top);
+    SetBorderLeft(left);
+    SetBorderRight(right);
+  }
+
+  BarStyle(const BarStyle&) = default;
+  BarStyle(BarStyle&&) = default;
+  BarStyle& operator=(const BarStyle&) = default;
+  BarStyle& operator=(BarStyle&&) = default;
+  ~BarStyle() = default;
+
+  // Getters
+
+  std::string GetBorderTop() const { return border_top_; }
+  std::string GetBorderLeft() const { return border_left_; }
+  std::string GetBorderRight() const { return border_right_; }
+
+  // Setters
+
+  BarStyle& SetBorderTop(const std::string& top) {
+    border_top_ = CheckAndReformat(top.size() == 0 ? kDefaultPenBlank : top);
+    return *this;
+  }
+
+  BarStyle& SetBorderTop(char top) {
+    SetBorderTop(std::string(1, top));
+    return *this;
+  }
+
+  BarStyle& SetBorderLeft(const std::string& left) {
+    border_left_ = CheckAndReformat(left.size() == 0 ? kDefaultPenBlank : left);
+    return *this;
+  }
+
+  BarStyle& SetBorderLeft(char left) {
+    SetBorderLeft(std::string(1, left));
+    return *this;
+  }
+
+  BarStyle& SetBorderRight(const std::string& right) {
+    border_right_ = CheckAndReformat(right.size() == 0 ? kDefaultPenBlank : right);
+    return *this;
+  }
+
+  BarStyle& SetBorderRight(char right) {
+    SetBorderRight(std::string(1, right));
+    return *this;
+  }
+
+private:
+  std::string border_top_;
+  std::string border_left_;
+  std::string border_right_;
 };
 
 //********************************** Cell ***********************************//
@@ -856,7 +934,7 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& SetPenStyle(const PenStyle &pen) {
+  Subtype& SetPenStyle(const PenStyle& pen) {
     penstyle_ = pen;
     return static_cast<Subtype&>(*this);
   }
@@ -1054,7 +1132,75 @@ template<class Subtype>
 class __HistPlot : public __Plot<Subtype> { 
 public:
   __HistPlot(int width = kConsoleWidth, int height = kConsoleHeight)
-        : __Plot<Subtype>(width, height) { }
+      : __Plot<Subtype>(width, height) {
+    nbins_ = this->GetWidth();
+  }
+
+  template<class T>
+  Subtype& PlotHistogram(const std::vector<T>& data) {
+    static_assert(std::is_arithmetic<T>::value,
+      "PlotHist supports only vectors of arithmetic type.");
+    
+    const int distinct = std::set<T>(data.begin(), data.end()).size();
+    nbins_ = std::min(nbins_, distinct);
+
+    auto mm = std::minmax_element(data.begin(), data.end());
+    const T min = *mm.first;
+    const T max = *mm.second;
+    const T step = (max - min) / (nbins_ - 1);
+    this->xlim_left_ = min - step / 2;
+    this->xlim_right_ = max + step / 2;
+
+    std::vector<int> counts(nbins_);
+    for (const auto& i : data) {
+      int idx = (i - this->xlim_left_) / step;
+      ++counts[idx];
+    }
+
+    const int max_bar_height = *std::max_element(counts.begin(), counts.end());
+    std::vector<int> bars = counts;
+    const double factor = 0.80;
+    for (auto& i : bars) {
+      i = i / static_cast<double>(max_bar_height) * this->GetHeight() * factor;
+    }
+
+    const auto cell_line = Cell{}.SetValue(this->penstyle_, CellStatus::Line);
+    const auto cell_area = Cell{}.SetValue(this->penstyle_, CellStatus::Area);
+    const auto cell_contour = Cell{}.SetValue(PenStyle{}.SetAreaStyle('|'), CellStatus::Area);
+    const int bin_width = this->GetWidth() / nbins_;
+    for (int i = 0; i < nbins_; ++i) {
+      for (int k = 0; k < bin_width; ++k) {
+        for (int j = 0; j < bars[i] + 1; ++j) {
+          if (k == 0 || k == bin_width - 1) {
+            if (j != bars[i]) {
+              this->at((i * bin_width) + k, j) = cell_contour;
+            }
+          } else if (j == bars[i]) {
+            this->at((i * bin_width) + k, j) = cell_line;
+          } else {
+            this->at((i * bin_width) + k, j) = cell_area;
+          }
+        }
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  // Getters
+
+  BarStyle& GetBarStyle() { return barstyle_; }
+  const BarStyle& GetBarStyle() const { return barstyle_; }
+  
+  // Setters
+
+  Subtype& SetBarStyle(const BarStyle& barstyle) {
+    barstyle_ = barstyle;
+    return *this;
+  }
+  
+protected:
+  int nbins_;
+  BarStyle barstyle_;
 };
 
 class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlot; };

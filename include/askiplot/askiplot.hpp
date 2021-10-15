@@ -320,7 +320,15 @@ public:
     return *this;
   }
 
-  Brush operator[](const std::string& brush_name) const {
+  std::string operator[](const std::string& brush_name) const {
+    auto it = brushes_.find(brush_name);
+    if (it == brushes_.end()) {
+      return DefaultBrushBlank;
+    }
+    return it->second;
+  }
+
+  Brush GetBrush(const std::string& brush_name) const {
     auto it = brushes_.find(brush_name);
     if (it == brushes_.end()) {
       return {};
@@ -454,25 +462,25 @@ public:
 
   Subtype& DrawBorders(Borders borders) {
     if (borders & Borders::Left) {
-      const auto brush_left = palette_["BorderLeft"];
+      const auto brush_left = palette_.GetBrush("BorderLeft");
       for (int j = 0; j < height_; ++j) {
         at(0, j) = brush_left;
       }
     }
     if (borders & Borders::Right) {
-      const auto brush_right = palette_["BorderRight"];
+      const auto brush_right = palette_.GetBrush("BorderRight");
       for (int j = 0; j < height_; ++j) {
         at(width_ - 1, j) = brush_right;
       }
     }
     if (borders & Borders::Bottom) {
-      const auto brush_bottom = palette_["BorderBottom"];
+      const auto brush_bottom = palette_.GetBrush("BorderBottom");
       for (int i = 0; i < width_; ++i) {
         at(i, 0) = brush_bottom;
       }
     }
     if (borders & Borders::Top) {
-      const auto brush_top = palette_["BorderTop"];
+      const auto brush_top = palette_.GetBrush("BorderTop");
       for (int i = 0; i < width_; ++i) {
         at(i, height_ - 1) = brush_top;
       }
@@ -522,7 +530,7 @@ public:
   }
 
   Subtype& DrawLine(double x_begin, double y_begin, double x_end, double y_end) {
-    auto brush_line = palette_["Main"];
+    auto brush_line = palette_.GetBrush("Main");
 
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
@@ -577,7 +585,7 @@ public:
 
   Subtype& DrawLineHorizontalAtRow(int row) {
     if (row < height_) {
-      auto brush_line = palette_["Main"];
+      auto brush_line = palette_.GetBrush("Main");
       for (int i = 0; i < width_; ++i) {
         at(i, row) = brush_line;
       }
@@ -592,7 +600,7 @@ public:
 
   Subtype& DrawLineVerticalAtCol(int col) {
     if (col < width_) {
-      auto brush_line = palette_["Main"];
+      auto brush_line = palette_.GetBrush("Main");
       for (int j = 0; j < height_; ++j) {
         at(col, j) = brush_line;
       }
@@ -629,7 +637,7 @@ public:
       const double ystep = (ylim_top_ - ylim_bottom_) / height_;
       at(static_cast<int>((x - xlim_left_  ) / xstep),
          static_cast<int>((y - ylim_bottom_) / ystep))
-        = palette_["Main"];
+        = palette_.GetBrush("Main");
     }
     return static_cast<Subtype&>(*this);
   }
@@ -644,7 +652,7 @@ public:
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
     
     const std::size_t n = std::min({x.size(), y.size(), how_many});
-    const auto brush_line = palette_["Main"];
+    const auto brush_line = palette_.GetBrush("Main");
 
     for (std::size_t i = 0; i < n; ++i) {
       if (xlim_left_   < x[i] && x[i] < xlim_right_ &&
@@ -744,7 +752,7 @@ public:
   }
 
   Subtype& Fill() {
-    return Fill(palette_["Main"]);
+    return Fill(palette_.GetBrush("Main"));
   }
 
   PlotFusion<Subtype> Fusion() {
@@ -788,7 +796,7 @@ public:
     metadata_.push_back(
       PlotMetadata{}.SetLabel(label)
                     .SetLength(how_many)
-                    .SetBrush(palette_["Main"])
+                    .SetBrush(palette_.GetBrush("Main"))
     );
     return static_cast<Subtype&>(*this);
   }
@@ -803,7 +811,7 @@ public:
   Subtype& Redraw() {
     for (auto& brush : canvas_) {
       if (!brush.IsGeneral()) {
-        brush = palette_[brush.GetName()];
+        brush = palette_.GetBrush(brush.GetName());
       }
     }
     return static_cast<Subtype&>(*this);
@@ -1104,10 +1112,10 @@ public:
       i = i / static_cast<double>(max_bar_height) * this->GetHeight() * factor;
     }
   
-    const auto brush_top = this->palette_["BorderTop"];
-    const auto brush_left = this->palette_["BorderLeft"];
-    const auto brush_right = this->palette_["BorderRight"];
-    const auto brush_area = this->palette_["Area"];
+    const auto brush_top = this->palette_.GetBrush("BorderTop");
+    const auto brush_left = this->palette_.GetBrush("BorderLeft");
+    const auto brush_right = this->palette_.GetBrush("BorderRight");
+    const auto brush_area = this->palette_.GetBrush("Area");
     const int bin_width = this->GetWidth() / nbins_;
 
     for (int i = 0; i < nbins_; ++i) {

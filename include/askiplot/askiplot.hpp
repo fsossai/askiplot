@@ -328,14 +328,6 @@ public:
     return it->second;
   }
 
-  Brush GetBrush(const std::string& brush_name) const {
-    auto it = brushes_.find(brush_name);
-    if (it == brushes_.end()) {
-      return {};
-    }
-    return Brush(brush_name, it->second);
-  }
-
   bool HasBrush(const std::string& name) const {
     return brushes_.find(name) != brushes_.end();
   }
@@ -352,6 +344,28 @@ public:
       {"BorderRight", DefaultBrushBorderRight},
     });
     return *this;
+  }
+
+  // Getters
+
+  Brush GetBrush(const std::string& brush_name) const {
+    auto it = brushes_.find(brush_name);
+    if (it == brushes_.end()) {
+      return {};
+    }
+    return Brush(brush_name, it->second);
+  }
+
+  // Setters
+
+  Palette& SetBrush(const Brush& brush) {
+    brushes_[brush.GetName()] = brush.GetValue();
+    return *this;
+  }
+
+  Palette& SetBrush(const std::string& name, const std::string& value) {
+    Brush brush(name, value);
+    return SetBrush(brush);
   }
 
 private:

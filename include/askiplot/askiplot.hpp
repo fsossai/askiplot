@@ -26,6 +26,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #define ASKIPLOT_VERSION_MAJOR 0
 #define ASKIPLOT_VERSION_MINOR 1
@@ -33,14 +34,15 @@
 
 namespace askiplot {
 
-//******************************** Constants ********************************//
+//************************** Defauts and constants **************************//
 
-const std::string kDefaultPenLine = "_";
-const std::string kDefaultPenArea = "#";
-const std::string kDefaultPenBlank = " ";
-const std::string kDefaultBarBorderTop = "_";
-const std::string kDefaultBarBorderLeft = "|";
-const std::string kDefaultBarBorderRight = "|";
+std::string DefaultBrushMain = "_";
+std::string DefaultBrushArea = "#";
+std::string DefaultBrushBlank = " ";
+std::string DefaultBrushBorderTop = "_";
+std::string DefaultBrushBorderBottom = "_";
+std::string DefaultBrushBorderLeft = "|";
+std::string DefaultBrushBorderRight = "|";
 const int kConsoleHeight = 0;
 const int kConsoleWidth = 0;
 
@@ -60,20 +62,16 @@ public:
   }
 };
 
-class InvalidCellOrPenValue : public std::exception {
+class InvalidBrushValue : public std::exception {
 public:
   virtual const char* what() const noexcept override {
     return
-      "The value of a Cell or a Pen must be a single ASCII character or a single UTF16 char "
+      "The value of a Brush must be a single ASCII character or a single UTF16 char "
       "and cannot be 0x00 (string termination character).";
   }
 };
 
 //******************************* Enumerators *******************************//
-
-enum class CellStatus : uint16_t {
-  Line, Blank, Area, Text
-};
 
 enum Borders : char {
   None = 0x00, Left = 0x01, Right = 0x02, Bottom = 0x04, Top = 0x08, All = 0x0F
@@ -94,23 +92,6 @@ enum BlankFusion : bool {
 //******************** Namespace-private free functions *********************//
 
 namespace {
-
-std::string CheckAndReformat(const std::string& candidate) {
-  std::string result;
-  if (candidate.size() == 0) {
-    throw InvalidCellOrPenValue();
-  } else if (std::isprint(static_cast<unsigned char>(candidate[0]))) {
-    result.resize(1);
-    result[0] = candidate[0];
-  } else if (candidate.size() == 1) {
-    throw InvalidCellOrPenValue();
-  } else {
-    result.resize(2);
-    result[0] = candidate[0];
-    result[1] = candidate[1];
-  }
-  return result;
-}
 
 } // private namespace
 
@@ -230,234 +211,168 @@ double operator ""_percent(long double p) {
   return p / 100.0;
 }
 
-//*********************************** Pen ***********************************//
+//********************************** Brush **********************************//
 
-class PenStyle {
+class Brush {
 public:
-  PenStyle() {
-    SetLineStyle(kDefaultPenLine);
-    SetBlankStyle(kDefaultPenBlank);
-    SetAreaStyle(kDefaultPenArea);
+  Brush()
+      : name_("Blank") {
+    SetValue(DefaultBrushBlank);
   }
 
-  PenStyle(const std::string& line) : PenStyle() {
-    SetLineStyle(line);
-  }
-  
-  PenStyle(const char *line) : PenStyle() {
-    SetLineStyle(line);
+  Brush(const std::string& value)
+      : name_("Main") {
+    SetValue(value);
   }
 
-  PenStyle(char line) : PenStyle() {
-    SetLineStyle(std::string(1, line));
+  Brush(const char *value)
+      : name_("Main") {
+    SetValue(value);
   }
 
-  PenStyle(const PenStyle&) = default;
-  PenStyle(PenStyle&&) = default;
-  PenStyle& operator=(const PenStyle&) = default;
-  PenStyle& operator=(PenStyle&&) = default;
-  ~PenStyle() = default;
-  
-  // Getters
+  Brush(char value)
+      : name_("Main") {
+    SetValue(std::string(1, value));
+  }
 
-  std::string GetLineStyle() const { return line_; }
-  std::string GetBlankStyle() const { return blank_; }
-  std::string GetAreaStyle() const { return area_; }
+  Brush(const std::string& name, const std::string& value) {
+    SetName(name);
+    SetValue(value);
+  }
 
-  // Setters
+  Brush(const std::string& name, char value)
+      : Brush(name, std::string(1, value)) { }
 
-  PenStyle& SetLineStyle(const std::string& line) {
-    line_ = CheckAndReformat(line.size() == 0 ? kDefaultPenLine : line);
+  Brush(const Brush& other) {
+    name_ = other.name_;
+    value_ = other.value_;
+  }
+
+  Brush(Brush&& other) {
+    name_ = std::move(other.name_);
+    value_ = std::move(other.value_);
+  }
+
+  Brush& operator=(const Brush& other) {
+    name_ = other.name_;
+    value_ = other.value_;
     return *this;
   }
 
-  PenStyle& SetLineStyle(char line) {
-    return SetLineStyle(std::string(1, line));
-  }
-
-  PenStyle& SetBlankStyle(const std::string& blank) {
-    blank_ = CheckAndReformat(blank.size() == 0 ? kDefaultPenBlank : blank);
+  Brush& operator=(Brush&& other) {
+    name_ = std::move(other.name_);
+    value_ = std::move(other.value_);
     return *this;
   }
 
-  PenStyle& SetBlankStyle(char blank) {
-    return SetBlankStyle(std::string(1, blank));
+  bool IsGeneral() const {
+    return name_ == "*";
   }
-
-  PenStyle& SetAreaStyle(const std::string& area) {
-    area_ = CheckAndReformat(area.size() == 0 ? kDefaultPenArea : area);
-    return *this;
-  }
-
-  PenStyle& SetAreaStyle(char area) {
-    return SetAreaStyle(std::string(1, area));
-  }
-
-private:
-  std::string line_;
-  std::string blank_;
-  std::string area_;
-};
-
-//******************************** BarStyle *********************************//
-
-class BarStyle {
-public:
-  BarStyle() {
-    SetBorderTop(kDefaultBarBorderTop);
-    SetBorderLeft(kDefaultBarBorderLeft);
-    SetBorderRight(kDefaultBarBorderRight);
-  }
-
-  BarStyle(const std::string& top,
-           const std::string& left,
-           const std::string& right) {
-    SetBorderTop(top);
-    SetBorderLeft(left);
-    SetBorderRight(right);
-  }
-
-  BarStyle(const BarStyle&) = default;
-  BarStyle(BarStyle&&) = default;
-  BarStyle& operator=(const BarStyle&) = default;
-  BarStyle& operator=(BarStyle&&) = default;
-  ~BarStyle() = default;
 
   // Getters
 
-  std::string GetBorderTop() const { return border_top_; }
-  std::string GetBorderLeft() const { return border_left_; }
-  std::string GetBorderRight() const { return border_right_; }
+  std::string GetName() const { return name_; }
+  std::string GetValue() const { return value_; }
 
   // Setters
 
-  BarStyle& SetBorderTop(const std::string& top) {
-    border_top_ = CheckAndReformat(top.size() == 0 ? kDefaultPenBlank : top);
+  Brush& SetName(const std::string& name) {
+    name_ = name.size() == 0 ? "Unnamed" : name;
     return *this;
   }
 
-  BarStyle& SetBorderTop(char top) {
-    SetBorderTop(std::string(1, top));
-    return *this;
-  }
-
-  BarStyle& SetBorderLeft(const std::string& left) {
-    border_left_ = CheckAndReformat(left.size() == 0 ? kDefaultPenBlank : left);
-    return *this;
-  }
-
-  BarStyle& SetBorderLeft(char left) {
-    SetBorderLeft(std::string(1, left));
-    return *this;
-  }
-
-  BarStyle& SetBorderRight(const std::string& right) {
-    border_right_ = CheckAndReformat(right.size() == 0 ? kDefaultPenBlank : right);
-    return *this;
-  }
-
-  BarStyle& SetBorderRight(char right) {
-    SetBorderRight(std::string(1, right));
-    return *this;
+  Brush& SetValue(const std::string& value) {
+    if (value.size() == 0) {
+      throw InvalidBrushValue();
+    } else if (std::isprint(static_cast<unsigned char>(value[0]))) {
+      value_.resize(1);
+      value_[0] = value[0];
+    } else if (value.size() == 1) {
+      throw InvalidBrushValue();
+    } else {
+      value_.resize(2);
+      value_[0] = value[0];
+      value_[1] = value[1];
+    }
+    return *this;  
   }
 
 private:
-  std::string border_top_;
-  std::string border_left_;
-  std::string border_right_;
+  std::string name_;
+  std::string value_;
 };
 
-//********************************** Cell ***********************************//
-
-class Cell {
+class Palette {
 public:
-  Cell() {
-    SetValue(kDefaultPenBlank, CellStatus::Blank);
+  Palette() {
+    Reset();
   }
 
-  Cell(const Cell&) = default;
-
-  Cell(char c) {
-    value_[0] = c;
-    value_[1] = '\0';
-    status_ = CellStatus::Text;
-  }
-  
-  Cell(Cell&&) = default;
-  Cell& operator=(const Cell&) = default;
-  Cell& operator=(Cell&&) = default;
-  ~Cell() = default;
-
-  bool IsArea() const { return status_ == CellStatus::Area; }
-  bool IsBlank() const { return status_ == CellStatus::Blank; }
-  bool IsLine() const { return status_ == CellStatus::Line; }
-  bool IsText() const { return status_ == CellStatus::Text; }
-
-  const CellStatus& GetStatus() const { return status_; }
-
-  std::string GetValue() const {
-    if (value_[1] == '\0') {
-      return std::string(value_, 1);
-    }
-    return std::string(value_, 2);
-  }
-
-  Cell& SetValue(const PenStyle& pen, const CellStatus& status) {
-    status_ = status;
-    switch (status) { 
-    case CellStatus::Line:
-      SetValueRaw(pen.GetLineStyle());
-      break;
-    case CellStatus::Blank:
-      SetValueRaw(pen.GetBlankStyle());
-      break;
-    case CellStatus::Area:
-      SetValueRaw(pen.GetAreaStyle());
-      break;
-    case CellStatus::Text:
-      break;
-    }
+  Palette& operator()(const Brush& brush) {
+    brushes_[brush.GetName()] = brush.GetValue();
     return *this;
   }
 
-  Cell& SetValue(const PenStyle& pen) {
-    SetValue(pen, status_);
+  template<class T>
+  Palette& operator()(const std::string& brush_name, T brush_value) {
+    Brush brush(brush_name, brush_value);
+    this->operator()(brush);
+    return *this;
+  }
+
+  Brush operator[](const std::string& brush_name) const {
+    auto it = brushes_.find(brush_name);
+    if (it == brushes_.end()) {
+      return {};
+    }
+    return Brush(brush_name, it->second);
+  }
+
+  bool HasBrush(const std::string& name) const {
+    return brushes_.find(name) != brushes_.end();
+  }
+
+  Palette& Reset() {
+    brushes_.clear();
+    brushes_.insert({
+      {"Main", DefaultBrushMain},
+      {"Blank", DefaultBrushBlank},
+      {"Area", DefaultBrushArea},
+      {"BorderTop", DefaultBrushBorderTop},
+      {"BorderBottom", DefaultBrushBorderBottom},
+      {"BorderLeft", DefaultBrushBorderLeft},
+      {"BorderRight", DefaultBrushBorderRight},
+    });
     return *this;
   }
 
 private:
-  void SetValueRaw(const std::string& value) {
-    value_[0] = value[0];
-    value_[1] = value[1];
-  }
-
-  char value_[2];
-  CellStatus status_;
+  std::unordered_map<std::string, std::string> brushes_;
 };
 
 //****************************** PlotMetaData *******************************//
 
 struct PlotMetadata {
-  PlotMetadata& SetLabel(const std::string& l) { label = l; return *this; }
-  PlotMetadata& SetLength(std::size_t l) { length = l; return *this; }
-  PlotMetadata& SetPenStyle(const PenStyle& p) { penstyle = p; return *this; }
+  PlotMetadata& SetLabel(const std::string& label) { this->label = label; return *this; }
+  PlotMetadata& SetLength(std::size_t length) { this->length = length; return *this; }
+  PlotMetadata& SetBrush(const Brush& brush) { this->brush = brush; return *this; }
   
-  PenStyle penstyle;
+  Brush brush;
   std::size_t length = 0;
   std::string label = "";
 };
 
 class IPlot {
 public:
-  virtual Cell& at(int col, int row) = 0;
-  virtual const Cell& at(int col, int row) const = 0;
+  virtual Brush& at(int col, int row) = 0;
+  virtual const Brush& at(int col, int row) const = 0;
   virtual std::string Serialize() const = 0;
   virtual int GetWidth() const = 0;
   virtual int GetHeight() const = 0;
 protected:
   int width_;
   int height_;
-  std::vector<Cell> canvas_;
+  std::vector<Brush> canvas_;
 };
 
 //********************************** Plot ***********************************//
@@ -518,11 +433,11 @@ public:
     position.offset = Offset(new_col, new_row);
   }
 
-  virtual Cell& at(int col, int row) override {
+  virtual Brush& at(int col, int row) override {
     return canvas_[row + height_*col];
   }
 
-  virtual const Cell& at(int col, int row) const override {
+  virtual const Brush& at(int col, int row) const override {
     return canvas_[row + height_*col];
   }
 
@@ -532,31 +447,34 @@ public:
   }
 
   Subtype& Clear() {
-    auto cell_blank = Cell{}.SetValue(penstyle_, CellStatus::Blank);
-    std::fill(canvas_.begin(), canvas_.end(), cell_blank);
+    auto brush_blank = Brush();
+    std::fill(canvas_.begin(), canvas_.end(), brush_blank);
     return static_cast<Subtype&>(*this);
   }
 
   Subtype& DrawBorders(Borders borders) {
-    const auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
     if (borders & Borders::Left) {
+      const auto brush_left = palette_["BorderLeft"];
       for (int j = 0; j < height_; ++j) {
-        at(0, j) = cell_line;
+        at(0, j) = brush_left;
       }
     }
     if (borders & Borders::Right) {
+      const auto brush_right = palette_["BorderRight"];
       for (int j = 0; j < height_; ++j) {
-        at(width_ - 1, j) = cell_line;
+        at(width_ - 1, j) = brush_right;
       }
     }
     if (borders & Borders::Bottom) {
+      const auto brush_bottom = palette_["BorderBottom"];
       for (int i = 0; i < width_; ++i) {
-        at(i, 0) = cell_line;
+        at(i, 0) = brush_bottom;
       }
     }
     if (borders & Borders::Top) {
+      const auto brush_top = palette_["BorderTop"];
       for (int i = 0; i < width_; ++i) {
-        at(i, height_ - 1) = cell_line;
+        at(i, height_ - 1) = brush_top;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -578,25 +496,25 @@ public:
     const int pos_col = box_abs_pos.offset.GetCol();
     const int pos_row = box_abs_pos.offset.GetRow();
 
-    // Setting up Cells
-    auto cell_bottom = Cell{}.SetValue(PenStyle("_"), CellStatus::Line);
-    auto cell_top = Cell{}.SetValue(PenStyle("_"), CellStatus::Line);
-    auto cell_left = Cell{}.SetValue(PenStyle("|"), CellStatus::Line);
-    auto cell_right = Cell{}.SetValue(PenStyle("|"), CellStatus::Line);
+    // Setting up Brushes
+    auto brush_top = Brush("BorderTop", DefaultBrushBorderTop);
+    auto brush_bottom = Brush("BorderBottom", DefaultBrushBorderBottom);
+    auto brush_left = Brush("BorderLeft", DefaultBrushBorderLeft);
+    auto brush_right = Brush("BorderRight", DefaultBrushBorderRight);
 
     // Drawing box borders
     for (int i = pos_col; i < pos_col + box_width; ++i) {
-      at(i, pos_row) = cell_bottom;                 // Bottom
-      at(i, pos_row + box_height - 1) = cell_top;   // Top
+      at(i, pos_row) = brush_bottom;                 // Bottom
+      at(i, pos_row + box_height - 1) = brush_top;   // Top
     }
     for (int j = pos_row; j < pos_row + box_height - 1; ++j) {
-      at(pos_col, j) = cell_left;                    // Left
-      at(pos_col + box_width - 1, j) = cell_right;   // Right
+      at(pos_col, j) = brush_left;                    // Left
+      at(pos_col + box_width - 1, j) = brush_right;   // Right
     }
 
     // Writing labels
     for (std::size_t i = 0; i < metadata_.size(); ++i) {
-      DrawText(metadata_[i].penstyle.GetLineStyle() + " " + metadata_[i].label,
+      DrawText(metadata_[i].brush.GetValue() + " " + metadata_[i].label,
                Position(pos_col + 2, pos_row + box_height - 2 - i)
       );
     }
@@ -604,7 +522,7 @@ public:
   }
 
   Subtype& DrawLine(double x_begin, double y_begin, double x_end, double y_end) {
-    auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
+    auto brush_line = palette_["Main"];
 
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
@@ -626,7 +544,7 @@ public:
       const int j_adv = (row_beg < row_end) ? +1 : -1;
       double x_current = x_begin;
       for (int j = 0; std::abs(j) < n; j += j_adv) {
-        at(to_col(x_current), row_beg + j) = cell_line;
+        at(to_col(x_current), row_beg + j) = brush_line;
         x_current += x_adv;
       }
     } else {
@@ -634,7 +552,7 @@ public:
       const int i_adv = (col_beg < col_end) ? +1 : -1;
       double y_current = y_begin;
       for (int i = 0; std::abs(i) < n; i += i_adv) {
-        at(col_beg + i, to_row(y_current)) = cell_line;
+        at(col_beg + i, to_row(y_current)) = brush_line;
         y_current += y_adv;
       }
     }
@@ -659,9 +577,9 @@ public:
 
   Subtype& DrawLineHorizontalAtRow(int row) {
     if (row < height_) {
-      auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
+      auto brush_line = palette_["Main"];
       for (int i = 0; i < width_; ++i) {
-        at(i, row) = cell_line;
+        at(i, row) = brush_line;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -674,9 +592,9 @@ public:
 
   Subtype& DrawLineVerticalAtCol(int col) {
     if (col < width_) {
-      auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
+      auto brush_line = palette_["Main"];
       for (int j = 0; j < height_; ++j) {
-        at(col, j) = cell_line;
+        at(col, j) = brush_line;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -711,7 +629,7 @@ public:
       const double ystep = (ylim_top_ - ylim_bottom_) / height_;
       at(static_cast<int>((x - xlim_left_  ) / xstep),
          static_cast<int>((y - ylim_bottom_) / ystep))
-        .SetValue(penstyle_, CellStatus::Line);
+        = palette_["Main"];
     }
     return static_cast<Subtype&>(*this);
   }
@@ -726,13 +644,13 @@ public:
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
     
     const std::size_t n = std::min({x.size(), y.size(), how_many});
-    const auto cell_line = Cell{}.SetValue(penstyle_, CellStatus::Line);
+    const auto brush_line = palette_["Main"];
 
     for (std::size_t i = 0; i < n; ++i) {
       if (xlim_left_   < x[i] && x[i] < xlim_right_ &&
           ylim_bottom_ < y[i] && y[i] < ylim_top_) {
         at(static_cast<int>((x[i] - xlim_left_  ) / xstep),
-           static_cast<int>((y[i] - ylim_bottom_) / ystep)) = cell_line;
+           static_cast<int>((y[i] - ylim_bottom_) / ystep)) = brush_line;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -759,7 +677,7 @@ public:
     if (0 <= row && row < height_) {
       int n = std::min<int>(width_ - col, text.size());
       for (int i = 0; i < n; ++i) {
-        at(i + col, row) = text[i];
+        at(i + col, row) = Brush("*", text[i]);
       }
     }
     return static_cast<Subtype&>(*this);
@@ -786,7 +704,7 @@ public:
     if (0 <= col && col < width_) {
       int n = std::min<int>(row + 1, text.size());
       for (int j = 0; j < n; ++j) {
-        at(col, row - j).SetValue(PenStyle(&text[j]), CellStatus::Line);
+        at(col, row - j) = Brush("*", text[j]);
       }
     } else { std::cout << col << "\t" << row << std::endl; }
     return static_cast<Subtype&>(*this);
@@ -820,14 +738,13 @@ public:
     return extracted;
   }
 
-  Subtype& Fill(const PenStyle& pen) {
-    auto cell_new = Cell{}.SetValue(pen, CellStatus::Line);
-    std::fill(canvas_.begin(), canvas_.end(), cell_new);
+  Subtype& Fill(const Brush& brush) {
+    std::fill(canvas_.begin(), canvas_.end(), brush);
     return static_cast<Subtype&>(*this);
   }
 
   Subtype& Fill() {
-    return Fill(penstyle_);
+    return Fill(palette_["Main"]);
   }
 
   PlotFusion<Subtype> Fusion() {
@@ -845,6 +762,23 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& NewBrush(const Brush& brush) {
+    palette_(brush.GetName(), brush.GetValue());
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& NewBrush(const std::string& name, const std::string& value) {
+    return NewBrush(Brush(name, value));
+  }
+
+  Palette& NewBrushes() {
+    return palette_;
+  }
+
+  const Palette& NewBrushes() const {
+    return palette_;
+  }
+
   template<class Tx, class Ty>
   Subtype& PlotData(const std::vector<Tx>& x,
                     const std::vector<Ty>& y,
@@ -854,7 +788,7 @@ public:
     metadata_.push_back(
       PlotMetadata{}.SetLabel(label)
                     .SetLength(how_many)
-                    .SetPenStyle(penstyle_)
+                    .SetBrush(palette_["Main"])
     );
     return static_cast<Subtype&>(*this);
   }
@@ -867,10 +801,11 @@ public:
   }
 
   Subtype& Redraw() {
-    for (auto& cell : canvas_) {
-      cell.SetValue(penstyle_, cell.GetStatus());
+    for (auto& brush : canvas_) {
+      if (!brush.IsGeneral()) {
+        brush = palette_[brush.GetName()];
+      }
     }
-    
     return static_cast<Subtype&>(*this);
   }
 
@@ -878,6 +813,7 @@ public:
     std::stringstream ss("");
     for (int j = height_ - 1; j >= 0; --j) {
       for (int i = 0; i < width_; ++i) {
+        //std::cout << "[" << at(i, j).GetValue() << "]";
         ss << at(i, j).GetValue();
       }
       ss << "\n";
@@ -919,10 +855,19 @@ public:
   double GetXlimRight() const { return xlim_right_; }
   double GetYlimBottom() const { return ylim_bottom_; }
   double GetYlimTop() const { return ylim_top_; }
-  PenStyle& GetPenStyle() { return penstyle_; }
-  const PenStyle& GetPenStyle() const { return penstyle_; }
+  Palette& GetPalette() { return palette_; }
+  const Palette& GetPalette() const { return palette_; }
 
   // Setters
+
+  Subtype& SetMainBrush(const std::string& value) {
+    palette_("Main", value);
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& SetMainBrush(char value) {
+    return SetMainBrush(std::string(1, value));
+  }
 
   Subtype& SetName(std::string name) {
     name_ = name;
@@ -931,11 +876,6 @@ public:
 
   Subtype& SetTitle(std::string title) {
     title_ = title;
-    return static_cast<Subtype&>(*this);
-  }
-
-  Subtype& SetPenStyle(const PenStyle& pen) {
-    penstyle_ = pen;
     return static_cast<Subtype&>(*this);
   }
 
@@ -1053,7 +993,7 @@ protected:
 
   std::string name_;
   std::string title_;
-  PenStyle penstyle_;
+  Palette palette_;
   Borders autolimit_;
   double xlim_margin_;
   double xlim_left_;
@@ -1111,7 +1051,7 @@ public:
       } else {
         for (int i = col_beg; i < col_end; ++i) {
           for (int j = row_beg; j < row_end; ++j) {
-            if (!plot->at(i, j).IsBlank()) {
+            if (!(plot->at(i, j).GetName() == "Blank")) {
               baseplot_.at(i + off_c, j + off_r) = plot->at(i, j);
             }
           }
@@ -1137,9 +1077,9 @@ public:
   }
 
   template<class T>
-  Subtype& PlotHistogram(const std::vector<T>& data) {
+  Subtype& PlotHistogram(const std::vector<T>& data, double height_resize = 0.8) {
     static_assert(std::is_arithmetic<T>::value,
-      "PlotHist supports only vectors of arithmetic type.");
+      "PlotHistogram only supports vectors of arithmetic types.");
     
     const int distinct = std::set<T>(data.begin(), data.end()).size();
     nbins_ = std::min(nbins_, distinct);
@@ -1159,48 +1099,41 @@ public:
 
     const int max_bar_height = *std::max_element(counts.begin(), counts.end());
     std::vector<int> bars = counts;
-    const double factor = 0.80;
+    const double factor = std::min(1.0, height_resize);
     for (auto& i : bars) {
       i = i / static_cast<double>(max_bar_height) * this->GetHeight() * factor;
     }
-
-    const auto cell_line = Cell{}.SetValue(this->penstyle_, CellStatus::Line);
-    const auto cell_area = Cell{}.SetValue(this->penstyle_, CellStatus::Area);
-    const auto cell_contour = Cell{}.SetValue(PenStyle{}.SetAreaStyle('|'), CellStatus::Area);
+  
+    const auto brush_top = this->palette_["BorderTop"];
+    const auto brush_left = this->palette_["BorderLeft"];
+    const auto brush_right = this->palette_["BorderRight"];
+    const auto brush_area = this->palette_["Area"];
     const int bin_width = this->GetWidth() / nbins_;
+
     for (int i = 0; i < nbins_; ++i) {
       for (int k = 0; k < bin_width; ++k) {
         for (int j = 0; j < bars[i] + 1; ++j) {
-          if (k == 0 || k == bin_width - 1) {
+          if (k == 0) {
             if (j != bars[i]) {
-              this->at((i * bin_width) + k, j) = cell_contour;
+              this->at((i * bin_width) + k, j) = brush_left;
+            }
+          } else if (k == bin_width - 1) {
+            if (j != bars[i]) {
+              this->at((i * bin_width) + k, j) = brush_right;
             }
           } else if (j == bars[i]) {
-            this->at((i * bin_width) + k, j) = cell_line;
+            this->at((i * bin_width) + k, j) = brush_top;
           } else {
-            this->at((i * bin_width) + k, j) = cell_area;
+            this->at((i * bin_width) + k, j) = brush_area;
           }
         }
       }
     }
     return static_cast<Subtype&>(*this);
   }
-
-  // Getters
-
-  BarStyle& GetBarStyle() { return barstyle_; }
-  const BarStyle& GetBarStyle() const { return barstyle_; }
-  
-  // Setters
-
-  Subtype& SetBarStyle(const BarStyle& barstyle) {
-    barstyle_ = barstyle;
-    return *this;
-  }
   
 protected:
   int nbins_;
-  BarStyle barstyle_;
 };
 
 class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlot; };

@@ -697,8 +697,9 @@ public:
     const int row = pos_abs.offset.GetRow();
 
     if (0 <= row && row < height_) {
-      int n = std::min<int>(width_ - col, text.size());
-      for (int i = 0; i < n; ++i) {
+      const int n = std::min<int>(width_ - col, text.size());
+      const int cut_out = -std::min(0, col);
+      for (int i = cut_out; i < n; ++i) {
         at(i + col, row) = Brush("*", text[i]);
       }
     }
@@ -724,8 +725,9 @@ public:
     const int row = pos_abs.offset.GetRow();
 
     if (0 <= col && col < width_) {
-      int n = std::min<int>(row + 1, text.size());
-      for (int j = 0; j < n; ++j) {
+      const int n = std::min<int>(row + 1, text.size());
+      const int cut_out = std::max(row - height_ + 1, 0);
+      for (int j = cut_out; j < n; ++j) {
         at(col, row - j) = Brush("*", text[j]);
       }
     } else { std::cout << col << "\t" << row << std::endl; }

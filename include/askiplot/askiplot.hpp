@@ -502,6 +502,33 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& DrawBox(const Position& corner1,
+                   const Position& corner2,
+                   const Brush& brush) {
+    const auto pos_abs1 = GetAbsolutePosition(corner1);
+    const auto pos_abs2 = GetAbsolutePosition(corner2);
+
+    const int col_beg = std::min(pos_abs1.offset.GetCol(), pos_abs2.offset.GetCol());
+    const int row_beg = std::min(pos_abs1.offset.GetRow(), pos_abs2.offset.GetRow());
+    const int w_beg = -std::min(0, col_beg);
+    const int h_beg = -std::min(0, row_beg);
+    const int len_w = std::abs(pos_abs2.offset.GetCol() - pos_abs1.offset.GetCol()) + 1 - w_beg;
+    const int len_h = std::abs(pos_abs2.offset.GetRow() - pos_abs1.offset.GetRow()) + 1 - h_beg;
+    const int w_end = std::min(w_beg + len_w, width_);
+    const int h_end = std::min(h_beg + len_h, height_);
+
+    for (int i = w_beg; i < w_end; ++i) {
+      for (int j = h_beg; j < h_end; ++j) {
+        at(i + col_beg, j + row_beg) = brush;
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawBox(const Position& corner1, const Position& corner2) {
+    return DrawBox(corner1, corner2, palette_.GetBrush("Area"));
+  }
+
   Subtype& DrawLegend(const Position& position = {}) {
     if (metadata_.size() == 0) return static_cast<Subtype&>(*this);
 
@@ -745,18 +772,22 @@ public:
   }
 
   Subtype Extract(const Position& corner1, const Position& corner2) const {
-    auto pos_abs1 = GetAbsolutePosition(corner1);
-    auto pos_abs2 = GetAbsolutePosition(corner2);
+    const auto pos_abs1 = GetAbsolutePosition(corner1);
+    const auto pos_abs2 = GetAbsolutePosition(corner2);
 
     const int col_beg = std::min(pos_abs1.offset.GetCol(), pos_abs2.offset.GetCol());
     const int row_beg = std::min(pos_abs1.offset.GetRow(), pos_abs2.offset.GetRow());
-    const int w = std::abs(pos_abs2.offset.GetCol() - pos_abs1.offset.GetCol()) + 1;
-    const int h = std::abs(pos_abs2.offset.GetRow() - pos_abs1.offset.GetRow()) + 1;
+    const int w_beg = -std::min(0, col_beg);
+    const int h_beg = -std::min(0, row_beg);
+    const int len_w = std::abs(pos_abs2.offset.GetCol() - pos_abs1.offset.GetCol()) + 1 - w_beg;
+    const int len_h = std::abs(pos_abs2.offset.GetRow() - pos_abs1.offset.GetRow()) + 1 - h_beg;
+    const int w_end = std::min(w_beg + len_w, width_);
+    const int h_end = std::min(h_beg + len_h, height_);
 
-    Subtype extracted(w, h);
-    for (int i = 0; i < w; ++i) {
-      for (int j = 0; j < h; ++j) {
-        extracted.at(i, j) = this->at(i + col_beg, j + row_beg);
+    Subtype extracted(w_end - w_beg + 1, h_end - h_beg + 1);
+    for (int i = w_beg; i < w_end; ++i) {
+      for (int j = h_beg; j < h_end; ++j) {
+        extracted.at(i - w_beg, j - h_beg) = this->at(i + col_beg, j + row_beg);
       }
     }
     return extracted;

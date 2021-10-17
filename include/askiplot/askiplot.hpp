@@ -1131,11 +1131,24 @@ public:
     nbins_ = this->GetWidth();
   }
 
+  Subtype& DrawHistogramValues(const Offset& text_offset = {0, 0}) {
+    const int bin_width = this->GetWidth() / nbins_;
+    int bar_col = 0;
+    for (int i = 0; i < nbins_; ++i) {
+      this->DrawTextCentered(std::to_string(bar_counts_[i]),
+                             Offset(bar_col + bin_width / 2,
+                                    bar_heights_[i]) + text_offset,
+                             DontAdjust);
+      bar_col += bin_width;
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
   template<class T>
   Subtype& PlotHistogram(const std::vector<T>& data, double height_resize = 0.8) {
     static_assert(std::is_arithmetic<T>::value,
       "PlotHistogram only supports vectors of arithmetic types.");
-    
+
     const int distinct = std::set<T>(data.begin(), data.end()).size();
     nbins_ = std::min(nbins_, distinct);
 
@@ -1146,16 +1159,16 @@ public:
     this->xlim_left_ = min - step / 2;
     this->xlim_right_ = max + step / 2;
 
-    std::vector<int> counts(nbins_);
+    bar_counts_.resize(nbins_);
     for (const auto& i : data) {
       int idx = (i - this->xlim_left_) / step;
-      ++counts[idx];
+      ++bar_counts_[idx];
     }
 
-    const int max_bar_height = *std::max_element(counts.begin(), counts.end());
-    std::vector<int> bars = counts;
+    const int max_bar_height = *std::max_element(bar_counts_.begin(), bar_counts_.end());
+    bar_heights_ = bar_counts_;
     const double factor = std::min(1.0, height_resize);
-    for (auto& i : bars) {
+    for (auto& i : bar_heights_) {
       i = i / static_cast<double>(max_bar_height) * this->GetHeight() * factor;
     }
   
@@ -1167,16 +1180,16 @@ public:
 
     for (int i = 0; i < nbins_; ++i) {
       for (int k = 0; k < bin_width; ++k) {
-        for (int j = 0; j < bars[i] + 1; ++j) {
+        for (int j = 0; j < bar_heights_[i] + 1; ++j) {
           if (k == 0) {
-            if (j != bars[i]) {
+            if (j != bar_heights_[i]) {
               this->at((i * bin_width) + k, j) = brush_left;
             }
           } else if (k == bin_width - 1) {
-            if (j != bars[i]) {
+            if (j != bar_heights_[i]) {
               this->at((i * bin_width) + k, j) = brush_right;
             }
-          } else if (j == bars[i]) {
+          } else if (j == bar_heights_[i]) {
             this->at((i * bin_width) + k, j) = brush_top;
           } else {
             this->at((i * bin_width) + k, j) = brush_area;
@@ -1189,6 +1202,8 @@ public:
   
 protected:
   int nbins_;
+  std::vector<int> bar_heights_;
+  std::vector<int> bar_counts_;
 };
 
 class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlot; };

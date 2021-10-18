@@ -221,17 +221,17 @@ public:
   }
 
   Brush(const std::string& value)
-      : name_("Main") {
+      : name_("*") {
     SetValue(value);
   }
 
   Brush(const char *value)
-      : name_("Main") {
+      : name_("*") {
     SetValue(value);
   }
 
   Brush(char value)
-      : name_("Main") {
+      : name_("*") {
     SetValue(std::string(1, value));
   }
 
@@ -277,7 +277,7 @@ public:
   // Setters
 
   Brush& SetName(const std::string& name) {
-    name_ = name.size() == 0 ? "Unnamed" : name;
+    name_ = name.size() == 0 ? "*" : name;
     return *this;
   }
 
@@ -374,15 +374,45 @@ private:
 
 //****************************** PlotMetaData *******************************//
 
-struct PlotMetadata {
-  PlotMetadata& SetLabel(const std::string& label) { this->label = label; return *this; }
-  PlotMetadata& SetLength(std::size_t length) { this->length = length; return *this; }
-  PlotMetadata& SetBrush(const Brush& brush) { this->brush = brush; return *this; }
+template<class Subtype>
+struct __PlotMetadata {
+  Subtype& SetLabel(const std::string& label) {
+    this->label = label;
+    return static_cast<Subtype&>(*this);
+  }
+  
+  Subtype& SetLength(std::size_t length) {
+    this->length = length;
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& SetBrush(const Brush& brush) {
+    this->brush = brush;
+    return static_cast<Subtype&>(*this);
+  }
   
   Brush brush;
   std::size_t length = 0;
   std::string label = "";
 };
+
+struct PlotMetadata final : public __PlotMetadata<PlotMetadata> { };
+
+//***************************** BarPlotMetadata *****************************//
+
+template<class Subtype>
+struct __BarPlotMetadata : public __PlotMetadata<Subtype> {
+  Subtype& SetBarYdata(std::vector<double> ydata) {
+    this->ydata = std::move(ydata);
+    return static_cast<Subtype&>(*this);
+  }
+
+  std::vector<double> ydata;
+};
+
+struct BarPlotMetadata final : public __BarPlotMetadata<BarPlotMetadata> { };
+
+//********************************** IPlot **********************************//
 
 class IPlot {
 public:
@@ -420,10 +450,10 @@ public:
       height_ = height;
     }
     autolimit_ = Borders::All;
-    xlim_margin_ = 0.05;
+    xlim_margin_ = 0.01;
     xlim_left_ = 0.0;
     xlim_right_ = 1.0;
-    ylim_margin_ = 0.020;
+    ylim_margin_ = 0.020;//0.020
     ylim_bottom_ = 0.0;
     ylim_top_ = 1.0;
     canvas_.resize(height_ * width_);
@@ -571,7 +601,7 @@ public:
   }
 
   Subtype& DrawLine(double x_begin, double y_begin, double x_end, double y_end) {
-    auto brush_line = palette_.GetBrush("Main");
+    auto brush = palette_.GetBrush("Main");
 
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
@@ -593,7 +623,7 @@ public:
       const int j_adv = (row_beg < row_end) ? +1 : -1;
       double x_current = x_begin;
       for (int j = 0; std::abs(j) < n; j += j_adv) {
-        at(to_col(x_current), row_beg + j) = brush_line;
+        at(to_col(x_current), row_beg + j) = brush;
         x_current += x_adv;
       }
     } else {
@@ -601,7 +631,7 @@ public:
       const int i_adv = (col_beg < col_end) ? +1 : -1;
       double y_current = y_begin;
       for (int i = 0; std::abs(i) < n; i += i_adv) {
-        at(col_beg + i, to_row(y_current)) = brush_line;
+        at(col_beg + i, to_row(y_current)) = brush;
         y_current += y_adv;
       }
     }
@@ -626,9 +656,9 @@ public:
 
   Subtype& DrawLineHorizontalAtRow(int row) {
     if (row < height_) {
-      auto brush_line = palette_.GetBrush("Main");
+      auto brush = palette_.GetBrush("Main");
       for (int i = 0; i < width_; ++i) {
-        at(i, row) = brush_line;
+        at(i, row) = brush;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -641,9 +671,9 @@ public:
 
   Subtype& DrawLineVerticalAtCol(int col) {
     if (col < width_) {
-      auto brush_line = palette_.GetBrush("Main");
+      auto brush = palette_.GetBrush("Main");
       for (int j = 0; j < height_; ++j) {
-        at(col, j) = brush_line;
+        at(col, j) = brush;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -693,13 +723,13 @@ public:
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
     
     const std::size_t n = std::min({x.size(), y.size(), how_many});
-    const auto brush_line = palette_.GetBrush("Main");
+    const auto brush = palette_.GetBrush("Main");
 
     for (std::size_t i = 0; i < n; ++i) {
       if (xlim_left_   < x[i] && x[i] < xlim_right_ &&
           ylim_bottom_ < y[i] && y[i] < ylim_top_) {
         at(static_cast<int>((x[i] - xlim_left_  ) / xstep),
-           static_cast<int>((y[i] - ylim_bottom_) / ystep)) = brush_line;
+           static_cast<int>((y[i] - ylim_bottom_) / ystep)) = brush;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -876,6 +906,54 @@ public:
     return ss.str();
   }
 
+  template<class Tx, class Ty>
+  Subtype& SetAutoLimits(const std::vector<Tx>& x,
+                         const std::vector<Ty>& y) {
+    auto x_margin_surplus = [this](){ return std::abs((xlim_right_ - xlim_left_) * xlim_margin_); };
+    auto y_margin_surplus = [this](){ return std::abs((ylim_top_ - ylim_bottom_) * ylim_margin_); };
+    
+    // Left and Right
+    if (x.size() > 0) {
+      if (autolimit_ & Borders::Left) {
+        if (autolimit_ & Borders::Right) {
+          auto mm = std::minmax_element(x.begin(), x.end());
+          xlim_left_ = *mm.first;
+          xlim_right_ = *mm.second;
+          double ms = x_margin_surplus();
+          xlim_left_ -= ms;
+          xlim_right_ += ms;
+        } else {
+          xlim_left_ = *std::min_element(x.begin(), x.end());
+          xlim_left_ -= x_margin_surplus();
+        }
+      } else if (autolimit_ & Borders::Right) {
+        xlim_right_ = *std::max_element(x.begin(), x.end());
+        xlim_right_ += x_margin_surplus();
+      }
+    }
+
+    // Bottom and Top
+    if (y.size() > 0) {
+      if (autolimit_ & Borders::Bottom) {
+        if (autolimit_ & Borders::Top) {
+          auto mm = std::minmax_element(y.begin(), y.end());
+          ylim_bottom_ = *(mm.first);
+          ylim_top_ = *(mm.second);
+          double ms = y_margin_surplus();
+          ylim_bottom_ -= ms;
+          ylim_top_ += ms;
+        } else {
+          ylim_bottom_ = *std::min_element(y.begin(), y.end());
+          ylim_bottom_ += y_margin_surplus();
+        }
+      } else if (autolimit_ & Borders::Top) {
+        ylim_top_ = *std::max_element(y.begin(), y.end());
+        ylim_top_ += y_margin_surplus();
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
   // Getters
 
   Position GetAbsolutePosition(const Position& position) const {
@@ -1003,49 +1081,6 @@ protected:
     }
   }
 
-  template<class Tx, class Ty>
-  void SetAutoLimits(const std::vector<Tx>& x,
-                     const std::vector<Ty>& y) {
-    auto x_margin_surplus = [this](){ return std::abs((xlim_right_ - xlim_left_) * xlim_margin_); };
-    auto y_margin_surplus = [this](){ return std::abs((ylim_top_ - ylim_bottom_) * ylim_margin_); };
-    
-    // Left and Right
-    if (autolimit_ & Borders::Left) {
-      if (autolimit_ & Borders::Right) {
-        auto mm = std::minmax_element(x.begin(), x.end());
-        xlim_left_ = *mm.first;
-        xlim_right_ = *mm.second;
-        double ms = x_margin_surplus();
-        xlim_left_ -= ms;
-        xlim_right_ += ms;
-      } else {
-        xlim_left_ = *std::min_element(x.begin(), x.end());
-        xlim_left_ -= x_margin_surplus();
-      }
-    } else if (autolimit_ & Borders::Right) {
-      xlim_right_ = *std::max_element(x.begin(), x.end());
-      xlim_right_ += x_margin_surplus();
-    }
-
-    // Bottom and Top
-    if (autolimit_ & Borders::Bottom) {
-      if (autolimit_ & Borders::Top) {
-        auto mm = std::minmax_element(y.begin(), y.end());
-        ylim_bottom_ = *(mm.first);
-        ylim_top_ = *(mm.second);
-        double ms = y_margin_surplus();
-        ylim_bottom_ -= ms;
-        ylim_top_ += ms;
-      } else {
-        ylim_bottom_ = *std::min_element(y.begin(), y.end());
-        ylim_bottom_ += y_margin_surplus();
-      }
-    } else if (autolimit_ & Borders::Top) {
-      ylim_top_ = *std::max_element(y.begin(), y.end());
-      ylim_top_ += y_margin_surplus();
-    }
-  }
-
   std::string name_;
   std::string title_;
   Palette palette_;
@@ -1121,20 +1156,166 @@ private:
   std::vector<std::pair<const IPlot*, Offset>> plots_offsets_;
 };
 
+//********************************* BarPlot *********************************//
+
+// Forward declaration
+template<class T>
+class GroupedBars;
+
+template<class Subtype>
+class __BarPlot : public __Plot<Subtype> {
+public:
+  __BarPlot(int width = kConsoleWidth, int height = kConsoleHeight)
+      : __Plot<Subtype>(width, height) {
+  }
+
+  /*Subtype& DrawBars() {
+    
+  }*/
+
+  Subtype& DrawBar(int col, int width, int height, const Brush& brush) {
+    if (width == 0) {
+      return static_cast<Subtype&>(*this);
+    }
+
+    const auto brush_area = brush;
+    const auto brush_top = this->palette_.GetBrush("BorderTop");
+
+    if (width < 3) {
+      for (int k = 0; k < width; ++k) {
+        for (int j = 0; j < height; ++j) {
+          this->at(col + k, j) = brush_area;
+        }
+        this->at(col + k, height) = brush_top;
+      }
+      return static_cast<Subtype&>(*this);
+    }
+
+    const auto brush_left = this->palette_.GetBrush("BorderLeft");
+    const auto brush_right = this->palette_.GetBrush("BorderRight");
+
+    for (int k = 0; k < width; ++k) {
+      for (int j = 0; j < height + 1; ++j) {
+        if (k == 0) {
+          if (j != height) {
+            this->at(col + k, j) = brush_left;
+          }
+        } else if (k == width - 1) {
+          if (j != height) {
+            this->at(col + k, j) = brush_right;
+          }
+        } else if (j == height) {
+          this->at(col + k, j) = brush_top;
+        } else {
+          this->at(col + k, j) = brush_area;
+        }
+      }
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& DrawBar(int col, int width, int height) {
+    return DrawBar(col, width, height, this->palette_.GetBrush("Area"));
+  }
+
+protected:
+  //
+  std::vector<int> bar_heights_;
+  std::vector<int> bar_counts_;
+};
+
+class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
+
+//******************************* GroupedBars *******************************//
+
+template<class T>
+class GroupedBars {
+public:
+  template<class Tx>
+  GroupedBars(T& baseplot, const std::vector<Tx>& xdata)
+      : baseplot_(baseplot)
+      , group_size_(1)
+      , ngroups_(xdata.size()) {
+    static_assert(std::is_base_of<__BarPlot<T>, T>::value, "Template type T must be a subtype of __Plot<T>.");
+    xdata_.resize(xdata.size());
+    std::transform(xdata.begin(), xdata.end(), xdata_.begin(),
+                   [](const auto& s) { return std::to_string(s); });
+  }
+
+  template<class Ty>
+  GroupedBars& operator()(const std::vector<Ty>& ydata,
+                          const std::string& label,
+                          const Brush& brush) {
+    if ((group_size_ + 1) * ngroups_ - 1 <= baseplot_.GetWidth()) {
+      ++group_size_;
+    } else {
+      return *this;
+    }
+    
+    const int nbars = std::min<int>(ngroups_, ydata.size());
+    std::vector<double> ydata_double(nbars);
+    std::transform(ydata.begin(), ydata.begin() + nbars, ydata_double.begin(),
+                   [](const auto& y) -> double { return y; });
+
+    metadata_.push_back(
+      BarPlotMetadata{}.SetLabel(label)
+                       .SetBrush(brush)
+                       .SetLength(nbars)
+                       .SetBarYdata(std::move(ydata_double))
+    );
+    return *this;
+  }
+
+  T& Draw() {
+    int current_col = 0;
+    int width = baseplot_.GetWidth() / (ngroups_ * group_size_);
+
+    //for (const auto& meta : metadata_) {
+    //  baseplot_.SetAutoLimits(std::vector<double>{}, meta.ydata);
+    //}
+    //baseplot_.SetYlimBottom(0);
+
+    const double ylim_top = baseplot_.GetYlimTop();
+    const double ylim_bottom = baseplot_.GetYlimBottom();
+    const double ystep = (ylim_top - ylim_bottom) / baseplot_.GetHeight();
+
+    auto to_height = [=](double y) -> int { return (y - ylim_bottom) / ystep; };
+
+    for (int i = 0; i < ngroups_; ++i) {
+      for (int j = 0; j < group_size_ - 1; ++j) {
+        baseplot_.DrawBar(current_col, width, 
+                          to_height(metadata_[j].ydata[i]),
+                          metadata_[j].brush);
+        current_col += width;
+      }
+      current_col += width;
+    }
+    return baseplot_;
+  }
+
+private:
+  T& baseplot_;
+  int group_size_;
+  const int ngroups_;
+  std::vector<std::string> xdata_;
+  std::vector<BarPlotMetadata> metadata_;
+};
+
 //******************************** HistPlot *********************************//
 
 template<class Subtype>
-class __HistPlot : public __Plot<Subtype> { 
+class __HistPlot : public __BarPlot<Subtype> { 
 public:
   __HistPlot(int width = kConsoleWidth, int height = kConsoleHeight)
-      : __Plot<Subtype>(width, height) {
+      : __BarPlot<Subtype>(width, height) {
     nbins_ = this->GetWidth();
   }
 
-  Subtype& DrawHistogramValues(const Offset& text_offset = {0, 0}) {
-    const int bin_width = this->GetWidth() / nbins_;
+  /*Subtype& DrawHistogramValues(const Offset& text_offset = {0, 0}) {
+    const int n = bar_heights_.size();
+    const int bin_width = this->GetWidth() / n;
     int bar_col = 0;
-    for (int i = 0; i < nbins_; ++i) {
+    for (int i = 0; i < n; ++i) {
       this->DrawTextCentered(std::to_string(bar_counts_[i]),
                              Offset(bar_col + bin_width / 2,
                                     bar_heights_[i]) + text_offset,
@@ -1142,9 +1323,9 @@ public:
       bar_col += bin_width;
     }
     return static_cast<Subtype&>(*this);
-  }
+  }*/
 
-  template<class T>
+  /*template<class T>
   Subtype& PlotHistogram(const std::vector<T>& data, double height_resize = 0.8) {
     static_assert(std::is_arithmetic<T>::value,
       "PlotHistogram only supports vectors of arithmetic types.");
@@ -1198,12 +1379,10 @@ public:
       }
     }
     return static_cast<Subtype&>(*this);
-  }
+  }*/
   
 protected:
   int nbins_;
-  std::vector<int> bar_heights_;
-  std::vector<int> bar_counts_;
 };
 
 class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlot; };

@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <numeric>
 #include <set>
 #include <sstream>
 #include <string>
@@ -122,7 +123,8 @@ private:
   int col_, row_;
 };
 
-struct Position {
+class Position {
+public:
   Position(int col, int row, const RelativePosition& relative = SouthWest)
       : offset(col, row)
       , relative(relative) { }
@@ -375,7 +377,8 @@ private:
 //****************************** PlotMetaData *******************************//
 
 template<class Subtype>
-struct __PlotMetadata {
+class __PlotMetadata {
+public:
   Subtype& SetLabel(const std::string& label) {
     this->label = label;
     return static_cast<Subtype&>(*this);
@@ -396,12 +399,13 @@ struct __PlotMetadata {
   std::string label = "";
 };
 
-struct PlotMetadata final : public __PlotMetadata<PlotMetadata> { };
+class PlotMetadata final : public __PlotMetadata<PlotMetadata> { };
 
 //***************************** BarPlotMetadata *****************************//
 
 template<class Subtype>
-struct __BarPlotMetadata : public __PlotMetadata<Subtype> {
+class __BarPlotMetadata : public __PlotMetadata<Subtype> {
+public:
   Subtype& SetBarYdata(std::vector<double> ydata) {
     this->ydata = std::move(ydata);
     return static_cast<Subtype&>(*this);
@@ -410,7 +414,7 @@ struct __BarPlotMetadata : public __PlotMetadata<Subtype> {
   std::vector<double> ydata;
 };
 
-struct BarPlotMetadata final : public __BarPlotMetadata<BarPlotMetadata> { };
+class BarPlotMetadata final : public __BarPlotMetadata<BarPlotMetadata> { };
 
 //********************************** IPlot **********************************//
 
@@ -1016,7 +1020,7 @@ public:
     if (new_xlim_left < xlim_right_) {
       xlim_left_ = new_xlim_left;
     }
-    return *this;
+    return static_cast<Subtype&>(*this);
   }
 
   Subtype& SetXlimRight(double new_xlim_right) {
@@ -1156,6 +1160,34 @@ private:
   std::vector<std::pair<const IPlot*, Offset>> plots_offsets_;
 };
 
+class Bar {
+public:
+  bool IsEmpty() const { return empty_; }
+  
+  // Getters
+  Brush GetBrush() const { return brush_; }
+  int GetColumn() const { return col_; }
+  int GetHeight() const { return height_; }
+  std::string GetName() const { return name_; }
+  int GetWidth() const { return width_; }
+
+  // Setters
+  Bar& SetBrush(const Brush& brush) { brush_ = brush; return *this; }
+  Bar& SetColumn(int col) { col_ = col; return *this; }
+  Bar& SetEmpty(bool empty) { empty_ = empty; return *this; }
+  Bar& SetHeight(int height) { height_ = height; return *this; }
+  Bar& SetName(const std::string& name) { name_ = name; return *this; }
+  Bar& SetWidth(int width) { width_ = width; return *this; }
+
+private:
+  int col_;
+  bool empty_;
+  int width_;
+  int height_;
+  std::string name_;
+  Brush brush_;
+};
+
 //********************************* BarPlot *********************************//
 
 // Forward declaration
@@ -1168,10 +1200,6 @@ public:
   __BarPlot(int width = kConsoleWidth, int height = kConsoleHeight)
       : __Plot<Subtype>(width, height) {
   }
-
-  /*Subtype& DrawBars() {
-    
-  }*/
 
   Subtype& DrawBar(int col, int width, int height, const Brush& brush) {
     if (width == 0) {
@@ -1214,14 +1242,85 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& DrawBar(const Bar& bar) {
+    if (bar.IsEmpty()) {
+      return static_cast<Subtype&>(*this);
+    }
+    return DrawBar(bar.GetColumn(), bar.GetWidth(), bar.GetHeight(), bar.GetBrush());
+  }
+
   Subtype& DrawBar(int col, int width, int height) {
     return DrawBar(col, width, height, this->palette_.GetBrush("Area"));
   }
 
+  Subtype& DrawBars(const std::vector<Bar>& bars) {
+    for (const auto& bar : bars) {
+      DrawBar(bar);
+    }
+    return static_cast<Subtype&>(*this);
+  }  
+
+  Subtype& PlotBars(const std::vector<Bar>& bars) {
+    bars_.clear();
+    std::copy_if(bars.begin(), bars.end(), std::back_inserter(bars_),
+                 [](const auto& b) { return !b.IsEmpty(); });
+    return DrawBars(bars);
+  }
+
+  template<class Tx, class Ty>
+  Subtype& PlotBars(const std::vector<Tx>& xdata,
+                    const std::vector<Ty>& ydata,
+                    const Brush& brush) {
+    auto xdata_s = xdata;
+    std::sort(xdata_s.begin(), xdata_s.end(), std::less<Tx>());
+    std::vector<Tx> diffs(xdata_s.size());
+    std::adjacent_difference(xdata_s.begin(), xdata_s.end(), diffs.begin());
+    auto min_diff = *std::min_element(diffs.begin(), diffs.end());
+    
+    const auto minmax_x = std::minmax_element(xdata_s.begin(), xdata_s.end());
+    const auto min_x = *minmax_x.first;
+    const auto max_x = *minmax_x.second;
+    const auto minmax_y = std::minmax_element(ydata.begin(), ydata.end());
+    const auto min_y = *minmax_y.first;
+    const auto max_y = *minmax_y.second;
+
+    this->SetXlimits(min_x - min_diff, max_x + min_diff);
+    this->SetYlimits(std::min(0, min_y), max_y * 1.05);
+
+    const double xlim_left = this->GetXlimLeft();
+    const double xlim_right = this->GetXlimRight();
+    const double ylim_top = this->GetYlimTop();
+    const double ylim_bottom = this->GetYlimBottom();
+
+    const double xstep = (xlim_right - xlim_left) / this->GetWidth();
+    const double ystep = (ylim_top - ylim_bottom) / this->GetHeight();
+    
+    const int bar_width = min_diff / xstep;
+    const std::size_t n = std::min(xdata.size(), ydata.size());
+
+    std::vector<Bar> bars;
+    bars.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      bars.push_back(
+        Bar{}.SetName(std::to_string(ydata[i]))
+             .SetHeight((ydata[i] - ylim_bottom) / ystep)
+             .SetColumn((xdata[i] - xlim_left  ) / xstep - bar_width / 2.0)
+             .SetWidth(bar_width)
+             .SetBrush(brush)
+             .SetEmpty(false)
+      );
+    }
+    return PlotBars(std::move(bars));
+  }
+
+  template<class Tx, class Ty>
+  Subtype& PlotBars(const std::vector<Tx>& xdata,
+                    const std::vector<Ty>& ydata) {
+    return PlotBars(xdata, ydata, this->palette_.GetBrush("Area"));
+  }
+
 protected:
-  //
-  std::vector<int> bar_heights_;
-  std::vector<int> bar_counts_;
+  std::vector<Bar> bars_;
 };
 
 class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
@@ -1236,7 +1335,8 @@ public:
       : baseplot_(baseplot)
       , group_size_(1)
       , ngroups_(xdata.size()) {
-    static_assert(std::is_base_of<__BarPlot<T>, T>::value, "Template type T must be a subtype of __Plot<T>.");
+    static_assert(std::is_base_of<__BarPlot<T>, T>::value,
+      "Template type T must be a subtype of __Plot<T>.");
     xdata_.resize(xdata.size());
     std::transform(xdata.begin(), xdata.end(), xdata_.begin(),
                    [](const auto& s) { return std::to_string(s); });

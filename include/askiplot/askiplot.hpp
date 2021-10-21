@@ -1288,6 +1288,7 @@ public:
   template<class Tx, class Ty>
   Subtype& PlotBars(const std::vector<Tx>& xdata,
                     const std::vector<Ty>& ydata,
+                    const std::string& label,
                     const Brush& brush) {
     auto xdata_s = xdata;
     std::sort(xdata_s.begin(), xdata_s.end(), std::less<Tx>());
@@ -1328,6 +1329,10 @@ public:
              .SetEmpty(false)
       );
     }
+    this->metadata_.push_back(
+      PlotMetadata{}.SetBrush(brush)
+                    .SetLabel(label)
+    );
     return PlotBars(std::move(bars));
   }
 
@@ -1443,7 +1448,9 @@ public:
   }
 
   template<class T>
-  Subtype& PlotHistogram(const std::vector<T>& data, double height_resize = 0.8) {
+  Subtype& PlotHistogram(const std::vector<T>& data,
+                         const std::string& label,
+                         double height_resize = 0.8) {
     static_assert(std::is_arithmetic<T>::value,
       "PlotHistogram only supports vectors of arithmetic types.");
 
@@ -1485,9 +1492,12 @@ public:
              .SetWidth(bin_width)
       );
     }
-    this->PlotBars(bars);
+    this->metadata_.push_back(
+      PlotMetadata{}.SetBrush(brush)
+                    .SetLabel(label)
+    );
     
-    return static_cast<Subtype&>(*this);
+    return this->PlotBars(bars);
   }
   
 protected:

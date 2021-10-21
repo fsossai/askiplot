@@ -1338,8 +1338,9 @@ public:
 
   template<class Tx, class Ty>
   Subtype& PlotBars(const std::vector<Tx>& xdata,
-                    const std::vector<Ty>& ydata) {
-    return PlotBars(xdata, ydata, this->palette_.GetBrush("Area"));
+                    const std::vector<Ty>& ydata,
+                    const std::string& label) {
+    return PlotBars(xdata, ydata, label, this->palette_.GetBrush("Area"));
   }
 
 protected:

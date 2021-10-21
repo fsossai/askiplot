@@ -569,7 +569,7 @@ public:
     return DrawBox(corner1, corner2, palette_.GetBrush("Area"));
   }
 
-  Subtype& DrawLegend(const Position& position = {}) {
+  Subtype& DrawLegend(const Position& position = NorthEast) {
     if (metadata_.size() == 0) return static_cast<Subtype&>(*this);
 
     int text_width =
@@ -1202,6 +1202,8 @@ class GroupedBars;
 
 template<class Subtype>
 class __BarPlot : public __Plot<Subtype> {
+template<class T>
+friend class GroupedBars;
 public:
   __BarPlot(int width = kConsoleWidth, int height = kConsoleHeight)
       : __Plot<Subtype>(width, height) {
@@ -1379,6 +1381,11 @@ public:
                        .SetLength(nbars)
                        .SetBarYdata(std::move(ydata_double))
                        .SetInteger(std::is_integral<Ty>::value)
+    );
+
+    baseplot_.metadata_.push_back(
+      PlotMetadata{}.SetBrush(brush)
+                    .SetLabel(label)
     );
     return *this;
   }

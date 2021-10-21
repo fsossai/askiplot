@@ -411,7 +411,13 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& SetInteger(bool integer) {
+    is_integer = integer;
+    return static_cast<Subtype&>(*this);
+  }
+
   std::vector<double> ydata;
+  bool is_integer;
 };
 
 class BarPlotMetadata final : public __BarPlotMetadata<BarPlotMetadata> { };
@@ -1267,6 +1273,19 @@ public:
     return DrawBars(bars);
   }
 
+  Subtype& DrawBarLabels(const Offset& text_offset = {0, 0}) {
+    const int n = bars_.size();
+    int bar_col = 0;
+    for (const auto& bar : bars_) {
+      this->DrawTextCentered(bar.GetName(),
+                             Offset(bar.GetColumn() + bar.GetWidth() / 2,
+                                    bar.GetHeight()) + text_offset,
+                             DontAdjust);
+      bar_col += bar.GetWidth();
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
   template<class Tx, class Ty>
   Subtype& PlotBars(const std::vector<Tx>& xdata,
                     const std::vector<Ty>& ydata,
@@ -1336,7 +1355,7 @@ public:
       , group_size_(1)
       , ngroups_(xdata.size()) {
     static_assert(std::is_base_of<__BarPlot<T>, T>::value,
-      "Template type T must be a subtype of __Plot<T>.");
+      "Template type T must be a subtype of __BarPlot<T>.");
     xdata_.resize(xdata.size());
     std::transform(xdata.begin(), xdata.end(), xdata_.begin(),
                    [](const auto& s) { return std::to_string(s); });
@@ -1362,18 +1381,14 @@ public:
                        .SetBrush(brush)
                        .SetLength(nbars)
                        .SetBarYdata(std::move(ydata_double))
+                       .SetInteger(std::is_integral<Ty>::value)
     );
     return *this;
   }
 
-  T& Draw() {
+  T& Plot(double height_resize = 0.8) {
     int current_col = 0;
     int width = baseplot_.GetWidth() / (ngroups_ * group_size_);
-
-    //for (const auto& meta : metadata_) {
-    //  baseplot_.SetAutoLimits(std::vector<double>{}, meta.ydata);
-    //}
-    //baseplot_.SetYlimBottom(0);
 
     const double ylim_top = baseplot_.GetYlimTop();
     const double ylim_bottom = baseplot_.GetYlimBottom();
@@ -1381,16 +1396,28 @@ public:
 
     auto to_height = [=](double y) -> int { return (y - ylim_bottom) / ystep; };
 
+    std::vector<Bar> bars;
     for (int i = 0; i < ngroups_; ++i) {
       for (int j = 0; j < group_size_ - 1; ++j) {
-        baseplot_.DrawBar(current_col, width, 
-                          to_height(metadata_[j].ydata[i]),
-                          metadata_[j].brush);
+        std::string name;
+        if (metadata_[j].is_integer) {
+          name = std::to_string(static_cast<long int>(metadata_[j].ydata[i]));
+        } else {
+          name = std::to_string(metadata_[j].ydata[i]);
+        }
+        bars.push_back(
+          Bar{}.SetName(name)
+               .SetHeight(to_height(metadata_[j].ydata[i]) * height_resize)
+               .SetBrush(metadata_[j].brush)
+               .SetColumn(current_col)
+               .SetWidth(width)
+        );
         current_col += width;
       }
+      bars.push_back(Bar{}.SetEmpty(true));
       current_col += width;
     }
-    return baseplot_;
+    return baseplot_.PlotBars(std::move(bars));
   }
 
 private:
@@ -1410,20 +1437,6 @@ public:
       : __BarPlot<Subtype>(width, height) {
     nbins_ = this->GetWidth();
   }
-
-  /*Subtype& DrawHistogramValues(const Offset& text_offset = {0, 0}) {
-    const int n = bar_heights_.size();
-    const int bin_width = this->GetWidth() / n;
-    int bar_col = 0;
-    for (int i = 0; i < n; ++i) {
-      this->DrawTextCentered(std::to_string(bar_counts_[i]),
-                             Offset(bar_col + bin_width / 2,
-                                    bar_heights_[i]) + text_offset,
-                             DontAdjust);
-      bar_col += bin_width;
-    }
-    return static_cast<Subtype&>(*this);
-  }*/
 
   /*template<class T>
   Subtype& PlotHistogram(const std::vector<T>& data, double height_resize = 0.8) {

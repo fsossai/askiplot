@@ -1266,24 +1266,21 @@ public:
     return static_cast<Subtype&>(*this);
   }  
 
-  Subtype& PlotBars(const std::vector<Bar>& bars) {
-    bars_.clear();
-    std::copy_if(bars.begin(), bars.end(), std::back_inserter(bars_),
-                 [](const auto& b) { return !b.IsEmpty(); });
-    return DrawBars(bars);
-  }
-
   Subtype& DrawBarLabels(const Offset& text_offset = {0, 0}) {
-    const int n = bars_.size();
-    int bar_col = 0;
     for (const auto& bar : bars_) {
       this->DrawTextCentered(bar.GetName(),
                              Offset(bar.GetColumn() + bar.GetWidth() / 2,
                                     bar.GetHeight()) + text_offset,
                              DontAdjust);
-      bar_col += bar.GetWidth();
     }
     return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& PlotBars(const std::vector<Bar>& bars) {
+    bars_.clear();
+    std::copy_if(bars.begin(), bars.end(), std::back_inserter(bars_),
+                 [](const auto& b) { return !b.IsEmpty(); });
+    return DrawBars(bars);
   }
 
   template<class Tx, class Ty>
@@ -1438,7 +1435,7 @@ public:
     nbins_ = this->GetWidth();
   }
 
-  /*template<class T>
+  template<class T>
   Subtype& PlotHistogram(const std::vector<T>& data, double height_resize = 0.8) {
     static_assert(std::is_arithmetic<T>::value,
       "PlotHistogram only supports vectors of arithmetic types.");
@@ -1446,53 +1443,45 @@ public:
     const int distinct = std::set<T>(data.begin(), data.end()).size();
     nbins_ = std::min(nbins_, distinct);
 
-    auto mm = std::minmax_element(data.begin(), data.end());
-    const T min = *mm.first;
-    const T max = *mm.second;
+    auto minmax = std::minmax_element(data.begin(), data.end());
+    const T min = *minmax.first;
+    const T max = *minmax.second;
     const T step = (max - min) / (nbins_ - 1);
-    this->xlim_left_ = min - step / 2;
-    this->xlim_right_ = max + step / 2;
+    this->SetXlimLeft(min - step / 2);
+    this->SetXlimRight(max + step / 2);
 
+    std::vector<int> bar_counts_;
     bar_counts_.resize(nbins_);
     for (const auto& i : data) {
-      int idx = (i - this->xlim_left_) / step;
+      int idx = (i - this->GetXlimLeft()) / step;
       ++bar_counts_[idx];
     }
 
     const int max_bar_height = *std::max_element(bar_counts_.begin(), bar_counts_.end());
-    bar_heights_ = bar_counts_;
+    std::vector<int> bar_heights_ = bar_counts_;
     const double factor = std::min(1.0, height_resize);
     for (auto& i : bar_heights_) {
       i = i / static_cast<double>(max_bar_height) * this->GetHeight() * factor;
     }
   
-    const auto brush_top = this->palette_.GetBrush("BorderTop");
-    const auto brush_left = this->palette_.GetBrush("BorderLeft");
-    const auto brush_right = this->palette_.GetBrush("BorderRight");
-    const auto brush_area = this->palette_.GetBrush("Area");
+    const auto brush = this->palette_.GetBrush("Area");
     const int bin_width = this->GetWidth() / nbins_;
 
+    std::vector<Bar> bars;
+    bars.resize(nbins_);
     for (int i = 0; i < nbins_; ++i) {
-      for (int k = 0; k < bin_width; ++k) {
-        for (int j = 0; j < bar_heights_[i] + 1; ++j) {
-          if (k == 0) {
-            if (j != bar_heights_[i]) {
-              this->at((i * bin_width) + k, j) = brush_left;
-            }
-          } else if (k == bin_width - 1) {
-            if (j != bar_heights_[i]) {
-              this->at((i * bin_width) + k, j) = brush_right;
-            }
-          } else if (j == bar_heights_[i]) {
-            this->at((i * bin_width) + k, j) = brush_top;
-          } else {
-            this->at((i * bin_width) + k, j) = brush_area;
-          }
-        }
-      }
+      bars.push_back(
+        Bar{}.SetName(std::to_string(bar_heights_[i]))
+             .SetHeight(bar_heights_[i])
+             .SetBrush(brush)
+             .SetColumn(i * bin_width)
+             .SetWidth(bin_width)
+      );
     }
+    this->PlotBars(bars);
+    
     return static_cast<Subtype&>(*this);
-  }*/
+  }
   
 protected:
   int nbins_;

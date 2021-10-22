@@ -1512,6 +1512,104 @@ protected:
 
 class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlot; };
 
+//******************************** GridPlot *********************************//
+
+template<class Subtype>
+class __GridPlot : public __Plot<Subtype> {
+public:
+  __GridPlot(int grid_rows, int grid_cols,
+             int width = kConsoleWidth, int height = kConsoleHeight)
+      : __Plot<Subtype>(width, height) {
+    grid_rows_ = std::max(0, grid_rows);
+    grid_cols_ = std::max(0, grid_cols);
+    nplots_ = grid_rows_ * grid_cols_;
+    plots_.resize(nplots_, nullptr);
+
+    subp_widths_.resize(grid_cols_);
+    subp_heights_.resize(grid_rows_);
+    const int div_w = this->width_ / grid_cols_;
+    const int div_h = this->height_ / grid_rows_;
+    const int rem_w = this->width_ % grid_cols_;
+    const int rem_h = this->height_ % grid_rows_;
+    for (int i = 0; i < grid_cols_; ++i) {
+      subp_widths_[i] = div_w + ((i < rem_w) ? 1 : 0);
+    }
+    for (int i = 0; i < grid_rows; ++i) {
+      subp_heights_[i] = div_h + ((i < rem_h) ? 1 : 0);
+    }
+  }
+
+  __GridPlot(std::vector<int> subplot_widths, std::vector<int> subplot_heights,
+             int width = kConsoleWidth, int height = kConsoleHeight)
+      : subp_widths_(subplot_widths)
+      , subp_heights_(subplot_heights)
+      , __Plot<Subtype>(width, height) {
+    int ww = std::accumulate(subp_widths_.begin(), subp_widths_.end(), 0);
+    int hh = std::accumulate(subp_heights_.begin(), subp_heights_.end(), 0);
+    grid_rows_ = subp_heights_.size();
+    grid_cols_ = subp_widths_.size();
+    if (ww != this->width_ || hh != this->height_) {
+      __GridPlot(grid_rows_, grid_cols_, width, height);
+    } else {
+      nplots_ = grid_rows_ * grid_cols_;
+      plots_.resize(nplots_, nullptr);
+    }
+  }
+
+  virtual Brush& At(int col, int row) override {
+    return const_cast<Brush&>(
+      static_cast<const Subtype*>(this)->At(col, row)
+    );
+  }
+
+  virtual const Brush& At(int col, int row) const override {
+    int ii = 0, i;
+    for (i = 0; i < grid_cols_; ++i) {
+      if (ii + subp_widths_[i] > col) {
+        break;
+      }
+      ii += subp_widths_[i];
+    }
+    
+    int jj = 0, j;
+    for (j = grid_rows_ - 1; j >= 0; --j) {
+      if (jj + subp_heights_[j] > row) {
+        break;
+      }
+      jj += subp_heights_[j];
+    }
+
+    if (plots_[i + j * grid_cols_] == nullptr) {
+      return this->canvas_[row + col * this->height_];
+    }
+    return plots_[i + j * grid_cols_]->At(col - ii, row - jj);
+  }
+
+  template<class T>
+  T& Get(int grid_row, int grid_col) {
+    return *dynamic_cast<T*>(plots_[grid_row * grid_cols_ + grid_col]);
+  }
+
+  Subtype& SetPlotAt(int grid_row, int grid_col, IPlot *plot) {
+    plots_[grid_row * grid_cols_ + grid_col] = plot;
+    return static_cast<Subtype&>(*this);
+  }
+
+  virtual std::string Serialize() const override {
+    return {};
+  }
+
+protected:
+  int nplots_;
+  int grid_rows_;
+  int grid_cols_;
+  std::vector<IPlot*> plots_;
+  std::vector<int> subp_widths_;
+  std::vector<int> subp_heights_;
+};
+
+class GridPlot final : public __GridPlot<GridPlot> { using __GridPlot::__GridPlot; };
+
 //***************************** Free functions ******************************//
 
 template<class T>

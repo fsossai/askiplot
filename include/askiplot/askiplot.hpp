@@ -426,8 +426,8 @@ class BarPlotMetadata final : public __BarPlotMetadata<BarPlotMetadata> { };
 
 class IPlot {
 public:
-  virtual Brush& at(int col, int row) = 0;
-  virtual const Brush& at(int col, int row) const = 0;
+  virtual Brush& At(int col, int row) = 0;
+  virtual const Brush& At(int col, int row) const = 0;
   virtual std::string Serialize() const = 0;
   virtual int GetWidth() const = 0;
   virtual int GetHeight() const = 0;
@@ -463,7 +463,7 @@ public:
     xlim_margin_ = 0.01;
     xlim_left_ = 0.0;
     xlim_right_ = 1.0;
-    ylim_margin_ = 0.020;//0.020
+    ylim_margin_ = 0.020;
     ylim_bottom_ = 0.0;
     ylim_top_ = 1.0;
     canvas_.resize(height_ * width_);
@@ -495,11 +495,11 @@ public:
     position.offset = Offset(new_col, new_row);
   }
 
-  virtual Brush& at(int col, int row) override {
+  virtual Brush& At(int col, int row) override {
     return canvas_[row + height_*col];
   }
 
-  virtual const Brush& at(int col, int row) const override {
+  virtual const Brush& At(int col, int row) const override {
     return canvas_[row + height_*col];
   }
 
@@ -509,8 +509,7 @@ public:
   }
 
   Subtype& Clear() {
-    auto brush_blank = Brush();
-    std::fill(canvas_.begin(), canvas_.end(), brush_blank);
+    Fill(palette_.GetBrush("Blank"));
     return static_cast<Subtype&>(*this);
   }
 
@@ -518,25 +517,25 @@ public:
     if (borders & Borders::Left) {
       const auto brush_left = palette_.GetBrush("BorderLeft");
       for (int j = 0; j < height_; ++j) {
-        at(0, j) = brush_left;
+        At(0, j) = brush_left;
       }
     }
     if (borders & Borders::Right) {
       const auto brush_right = palette_.GetBrush("BorderRight");
       for (int j = 0; j < height_; ++j) {
-        at(width_ - 1, j) = brush_right;
+        At(width_ - 1, j) = brush_right;
       }
     }
     if (borders & Borders::Bottom) {
       const auto brush_bottom = palette_.GetBrush("BorderBottom");
       for (int i = 0; i < width_; ++i) {
-        at(i, 0) = brush_bottom;
+        At(i, 0) = brush_bottom;
       }
     }
     if (borders & Borders::Top) {
       const auto brush_top = palette_.GetBrush("BorderTop");
       for (int i = 0; i < width_; ++i) {
-        at(i, height_ - 1) = brush_top;
+        At(i, height_ - 1) = brush_top;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -559,7 +558,7 @@ public:
 
     for (int i = w_beg; i < w_end; ++i) {
       for (int j = h_beg; j < h_end; ++j) {
-        at(i + col_beg, j + row_beg) = brush;
+        At(i + col_beg, j + row_beg) = brush;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -593,12 +592,12 @@ public:
 
     // Drawing box borders
     for (int i = pos_col; i < pos_col + box_width; ++i) {
-      at(i, pos_row) = brush_bottom;                 // Bottom
-      at(i, pos_row + box_height - 1) = brush_top;   // Top
+      At(i, pos_row) = brush_bottom;                 // Bottom
+      At(i, pos_row + box_height - 1) = brush_top;   // Top
     }
     for (int j = pos_row; j < pos_row + box_height - 1; ++j) {
-      at(pos_col, j) = brush_left;                    // Left
-      at(pos_col + box_width - 1, j) = brush_right;   // Right
+      At(pos_col, j) = brush_left;                    // Left
+      At(pos_col + box_width - 1, j) = brush_right;   // Right
     }
 
     // Writing labels
@@ -633,7 +632,7 @@ public:
       const int j_adv = (row_beg < row_end) ? +1 : -1;
       double x_current = x_begin;
       for (int j = 0; std::abs(j) < n; j += j_adv) {
-        at(to_col(x_current), row_beg + j) = brush;
+        At(to_col(x_current), row_beg + j) = brush;
         x_current += x_adv;
       }
     } else {
@@ -641,7 +640,7 @@ public:
       const int i_adv = (col_beg < col_end) ? +1 : -1;
       double y_current = y_begin;
       for (int i = 0; std::abs(i) < n; i += i_adv) {
-        at(col_beg + i, to_row(y_current)) = brush;
+        At(col_beg + i, to_row(y_current)) = brush;
         y_current += y_adv;
       }
     }
@@ -668,7 +667,7 @@ public:
     if (row < height_) {
       auto brush = palette_.GetBrush("Main");
       for (int i = 0; i < width_; ++i) {
-        at(i, row) = brush;
+        At(i, row) = brush;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -683,7 +682,7 @@ public:
     if (col < width_) {
       auto brush = palette_.GetBrush("Main");
       for (int j = 0; j < height_; ++j) {
-        at(col, j) = brush;
+        At(col, j) = brush;
       }
     }
     return static_cast<Subtype&>(*this);
@@ -716,7 +715,7 @@ public:
         ylim_bottom_ < y && y < ylim_top_) {
       const double xstep = (xlim_right_ - xlim_left_) / width_;
       const double ystep = (ylim_top_ - ylim_bottom_) / height_;
-      at(static_cast<int>((x - xlim_left_  ) / xstep),
+      At(static_cast<int>((x - xlim_left_  ) / xstep),
          static_cast<int>((y - ylim_bottom_) / ystep))
         = palette_.GetBrush("Main");
     }
@@ -738,7 +737,7 @@ public:
     for (std::size_t i = 0; i < n; ++i) {
       if (xlim_left_   < x[i] && x[i] < xlim_right_ &&
           ylim_bottom_ < y[i] && y[i] < ylim_top_) {
-        at(static_cast<int>((x[i] - xlim_left_  ) / xstep),
+        At(static_cast<int>((x[i] - xlim_left_  ) / xstep),
            static_cast<int>((y[i] - ylim_bottom_) / ystep)) = brush;
       }
     }
@@ -767,7 +766,7 @@ public:
       const int n = std::min<int>(width_ - col, text.size());
       const int cut_out = -std::min(0, col);
       for (int i = cut_out; i < n; ++i) {
-        at(i + col, row) = Brush("*", text[i]);
+        At(i + col, row) = Brush("*", text[i]);
       }
     }
     return static_cast<Subtype&>(*this);
@@ -795,7 +794,7 @@ public:
       const int n = std::min<int>(row + 1, text.size());
       const int cut_out = std::max(row - height_ + 1, 0);
       for (int j = cut_out; j < n; ++j) {
-        at(col, row - j) = Brush("*", text[j]);
+        At(col, row - j) = Brush("*", text[j]);
       }
     } else { std::cout << col << "\t" << row << std::endl; }
     return static_cast<Subtype&>(*this);
@@ -827,14 +826,18 @@ public:
     Subtype extracted(w_end - w_beg + 1, h_end - h_beg + 1);
     for (int i = w_beg; i < w_end; ++i) {
       for (int j = h_beg; j < h_end; ++j) {
-        extracted.at(i - w_beg, j - h_beg) = this->at(i + col_beg, j + row_beg);
+        extracted.At(i - w_beg, j - h_beg) = this->At(i + col_beg, j + row_beg);
       }
     }
     return extracted;
   }
 
   Subtype& Fill(const Brush& brush) {
-    std::fill(canvas_.begin(), canvas_.end(), brush);
+    for (int i = 0; i < width_; ++i) {
+      for (int j = 0; j < height_; ++j) {
+        At(i, j) = brush;
+      }
+    }
     return static_cast<Subtype&>(*this);
   }
 
@@ -855,15 +858,6 @@ public:
     Clear();
     Fusion()(copy, offset, DontAdjust).Fuse();
     return static_cast<Subtype&>(*this);
-  }
-
-  Subtype& NewBrush(const Brush& brush) {
-    palette_(brush.GetName(), brush.GetValue());
-    return static_cast<Subtype&>(*this);
-  }
-
-  Subtype& NewBrush(const std::string& name, const std::string& value) {
-    return NewBrush(Brush(name, value));
   }
 
   Palette& NewBrushes() {
@@ -896,9 +890,12 @@ public:
   }
 
   Subtype& Redraw() {
-    for (auto& brush : canvas_) {
-      if (!brush.IsGeneral()) {
-        brush = palette_.GetBrush(brush.GetName());
+    for (int i = 0; i < width_; ++i) {
+      for (int j = 0; j < height_; ++j) {
+        Brush& brush = At(i, j);
+        if (!brush.IsGeneral()) {
+          brush = palette_.GetBrush(brush.GetName());
+        }
       }
     }
     return static_cast<Subtype&>(*this);
@@ -908,8 +905,7 @@ public:
     std::stringstream ss("");
     for (int j = height_ - 1; j >= 0; --j) {
       for (int i = 0; i < width_; ++i) {
-        //std::cout << "[" << at(i, j).GetValue() << "]";
-        ss << at(i, j).GetValue();
+        ss << At(i, j).GetValue();
       }
       ss << "\n";
     }
@@ -1002,6 +998,15 @@ public:
   const Palette& GetPalette() const { return palette_; }
 
   // Setters
+
+  Subtype& SetBrush(const Brush& brush) {
+    palette_(brush.GetName(), brush.GetValue());
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& SetBrush(const std::string& name, const std::string& value) {
+    return SetBrush(Brush(name, value));
+  }
 
   Subtype& SetMainBrush(const std::string& value) {
     palette_("Main", value);
@@ -1145,14 +1150,14 @@ public:
       if (keep_blanks) {
         for (int i = col_beg; i < col_end; ++i) {
           for (int j = row_beg; j < row_end; ++j) {
-            baseplot_.at(i + off_c, j + off_r) = plot->at(i, j);
+            baseplot_.At(i + off_c, j + off_r) = plot->At(i, j);
           }
         }
       } else {
         for (int i = col_beg; i < col_end; ++i) {
           for (int j = row_beg; j < row_end; ++j) {
-            if (!(plot->at(i, j).GetName() == "Blank")) {
-              baseplot_.at(i + off_c, j + off_r) = plot->at(i, j);
+            if (!(plot->At(i, j).GetName() == "Blank")) {
+              baseplot_.At(i + off_c, j + off_r) = plot->At(i, j);
             }
           }
         }
@@ -1220,9 +1225,9 @@ public:
     if (width < 3) {
       for (int k = 0; k < width; ++k) {
         for (int j = 0; j < height; ++j) {
-          this->at(col + k, j) = brush_area;
+          this->At(col + k, j) = brush_area;
         }
-        this->at(col + k, height) = brush_top;
+        this->At(col + k, height) = brush_top;
       }
       return static_cast<Subtype&>(*this);
     }
@@ -1234,16 +1239,16 @@ public:
       for (int j = 0; j < height + 1; ++j) {
         if (k == 0) {
           if (j != height) {
-            this->at(col + k, j) = brush_left;
+            this->At(col + k, j) = brush_left;
           }
         } else if (k == width - 1) {
           if (j != height) {
-            this->at(col + k, j) = brush_right;
+            this->At(col + k, j) = brush_right;
           }
         } else if (j == height) {
-          this->at(col + k, j) = brush_top;
+          this->At(col + k, j) = brush_top;
         } else {
-          this->at(col + k, j) = brush_area;
+          this->At(col + k, j) = brush_area;
         }
       }
     }

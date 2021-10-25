@@ -513,7 +513,7 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& DrawBorders(Borders borders) {
+  Subtype& DrawBorders(Borders borders = Borders::All) {
     if (borders & Borders::Left) {
       const auto brush_left = palette_.GetBrush("BorderLeft");
       for (int j = 0; j < height_; ++j) {
@@ -901,7 +901,7 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  std::string Serialize() const override {
+  virtual std::string Serialize() const override {
     std::stringstream ss("");
     for (int j = height_ - 1; j >= 0; --j) {
       for (int i = 0; i < width_; ++i) {
@@ -1514,6 +1514,14 @@ class HistPlot final : public __HistPlot<HistPlot> { using __HistPlot::__HistPlo
 
 //******************************** GridPlot *********************************//
 
+// Forward declaration
+template<class T>
+class RowMajorGridSetter;
+
+// Forward declaration
+template<class T>
+class ColumnMajorGridSetter;
+
 template<class Subtype>
 class __GridPlot : public __Plot<Subtype> {
 public:
@@ -1541,9 +1549,9 @@ public:
 
   __GridPlot(std::vector<int> subplot_widths, std::vector<int> subplot_heights,
              int width = kConsoleWidth, int height = kConsoleHeight)
-      : subp_widths_(subplot_widths)
-      , subp_heights_(subplot_heights)
-      , __Plot<Subtype>(width, height) {
+      : __Plot<Subtype>(width, height)
+      , subp_widths_(subplot_widths)
+      , subp_heights_(subplot_heights) {
     int ww = std::accumulate(subp_widths_.begin(), subp_widths_.end(), 0);
     int hh = std::accumulate(subp_heights_.begin(), subp_heights_.end(), 0);
     grid_rows_ = subp_heights_.size();
@@ -1590,13 +1598,30 @@ public:
     return *dynamic_cast<T*>(plots_[grid_row * grid_cols_ + grid_col]);
   }
 
-  Subtype& SetPlotAt(int grid_row, int grid_col, IPlot *plot) {
-    plots_[grid_row * grid_cols_ + grid_col] = plot;
-    return static_cast<Subtype&>(*this);
+  template<class T>
+  const T& Get(int grid_row, int grid_col) const {
+    return *dynamic_cast<T*>(plots_[grid_row * grid_cols_ + grid_col]);
   }
 
-  virtual std::string Serialize() const override {
-    return {};
+  int GetGridRows() const {
+    return grid_rows_;
+  }
+
+  int GetGridColumns() const {
+    return grid_cols_;
+  }
+
+  ColumnMajorGridSetter<Subtype> SetInColumnMajor() {
+    return ColumnMajorGridSetter<Subtype>(static_cast<Subtype&>(*this));
+  }
+
+  RowMajorGridSetter<Subtype> SetInRowMajor() {
+    return RowMajorGridSetter<Subtype>(static_cast<Subtype&>(*this));
+  }
+
+  Subtype& SetPlotAt(int grid_row, int grid_col, IPlot& plot) {
+    plots_[grid_row * grid_cols_ + grid_col] = &plot;
+    return static_cast<Subtype&>(*this);
   }
 
 protected:
@@ -1610,11 +1635,78 @@ protected:
 
 class GridPlot final : public __GridPlot<GridPlot> { using __GridPlot::__GridPlot; };
 
+//***************************** RowMajorSetter ******************************//
+
+template<class T>
+class RowMajorGridSetter {
+public:
+  RowMajorGridSetter(T& baseplot)
+      : baseplot_(baseplot)
+      , idx_(0)
+      , grid_cols_(baseplot_.GetGridColumns())
+      , nplots_(baseplot_.GetGridRows() * grid_cols_) {
+    static_assert(std::is_base_of<__GridPlot<T>, T>::value,
+      "Template type T must be a subtype of __GridPlot<T>.");
+  }
+
+  RowMajorGridSetter& operator()(IPlot& plot) {
+    if (idx_ < nplots_) {
+      baseplot_.SetPlotAt(idx_ / grid_cols_, idx_ % grid_cols_, plot);
+      ++idx_;
+    }
+    return *this;
+  }
+
+  T& Set() {
+    return baseplot_;
+  }
+  
+private:
+  T& baseplot_;
+  int idx_;
+  int grid_cols_;
+  int nplots_;
+};
+
+//************************** ColumnMajorGridSetter **************************//
+
+template<class T>
+class ColumnMajorGridSetter {
+public:
+  ColumnMajorGridSetter(T& baseplot)
+      : baseplot_(baseplot)
+      , idx_(0)
+      , grid_rows_(baseplot_.GetGridRows())
+      , nplots_(grid_rows_ * baseplot_.GetGridColumns()) {
+    static_assert(std::is_base_of<__GridPlot<T>, T>::value,
+      "Template type T must be a subtype of __GridPlot<T>.");
+  }
+
+  ColumnMajorGridSetter& operator()(IPlot& plot) {
+    if (idx_ < nplots_) {
+      baseplot_.SetPlotAt(idx_ % grid_rows_, idx_ / grid_rows_, plot);
+      ++idx_;
+    }
+    return *this;
+  }
+
+  T& Set() {
+    return baseplot_;
+  }
+  
+private:
+  T& baseplot_;
+  int idx_;
+  int grid_rows_;
+  int nplots_;
+};
+
 //***************************** Free functions ******************************//
 
 template<class T>
 T BlankLike(const T& plot) {
-  static_assert(std::is_base_of<__Plot<T>, T>::value, "Template type T must be a subtype of __Plot<T>.");
+  static_assert(std::is_base_of<__Plot<T>, T>::value,
+    "Template type T must be a subtype of __Plot<T>.");
   return T(plot.GetWidth(), plot.GetHeight());
 }
 

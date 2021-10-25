@@ -1467,8 +1467,7 @@ public:
     const T min = *minmax.first;
     const T max = *minmax.second;
     const T step = (max - min) / (nbins_ - 1);
-    this->SetXlimLeft(min - step / 2);
-    this->SetXlimRight(max + step / 2);
+    this->SetXlimits(min - step / 2, max + step / 2);
 
     std::vector<int> bar_counts_;
     bar_counts_.resize(nbins_);
@@ -1483,7 +1482,6 @@ public:
     for (auto& i : bar_heights_) {
       i = i / static_cast<double>(max_bar_height) * this->GetHeight() * factor;
     }
-  
     const auto brush = this->palette_.GetBrush("Area");
     const int bin_width = this->GetWidth() / nbins_;
 

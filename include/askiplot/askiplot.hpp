@@ -44,6 +44,8 @@ std::string DefaultBrushBorderTop = "_";
 std::string DefaultBrushBorderBottom = "_";
 std::string DefaultBrushBorderLeft = "|";
 std::string DefaultBrushBorderRight = "|";
+std::string DefaultBrushLineHorizontal = "-";
+std::string DefaultBrushLineVertical = "|";
 const int kConsoleHeight = 0;
 const int kConsoleWidth = 0;
 
@@ -340,6 +342,8 @@ public:
       {"Main", DefaultBrushMain},
       {"Blank", DefaultBrushBlank},
       {"Area", DefaultBrushArea},
+      {"LineHorizontal", DefaultBrushLineHorizontal},
+      {"LineVertical", DefaultBrushLineVertical},
       {"BorderTop", DefaultBrushBorderTop},
       {"BorderBottom", DefaultBrushBorderBottom},
       {"BorderLeft", DefaultBrushBorderLeft},
@@ -665,7 +669,7 @@ public:
 
   Subtype& DrawLineHorizontalAtRow(int row) {
     if (row < height_) {
-      auto brush = palette_.GetBrush("Main");
+      auto brush = palette_.GetBrush("LineHorizontal");
       for (int i = 0; i < width_; ++i) {
         At(i, row) = brush;
       }
@@ -680,7 +684,7 @@ public:
 
   Subtype& DrawLineVerticalAtCol(int col) {
     if (col < width_) {
-      auto brush = palette_.GetBrush("Main");
+      auto brush = palette_.GetBrush("LineVertical");
       for (int j = 0; j < height_; ++j) {
         At(col, j) = brush;
       }

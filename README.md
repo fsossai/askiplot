@@ -1,7 +1,11 @@
 # AskiPlot
 
-AskiPlot is a lightweight tool+library for creating plots by means of ASCII characters only.
+AskiPlot is a lightweight tool+library written in C++14 for creating plots by means of ASCII characters only.
 Users can plot CSV streams from the standard input or files.
+The library makes extensive use of [CRTP](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern) (Curiously Recurring Template Pattern) and is designed to have a [Fluent interface](https://en.wikipedia.org/wiki/Fluent_interface).
+
+The initial idea was to allow user to write plots with chained member functions, this natually led to
+CRTP and static polymorphism as concepts embracing most of the classes.
 
 ## Getting started
 
@@ -31,11 +35,11 @@ make
 
 ## Features / Implementation status
 
-- [ ] Lines plot
-- [ ] Count plot
-- [ ] Bar plot
+- [x] Plotting points
+- [x] Histograms
+- [x] Bar plots
+- [x] Grids
 - [ ] Input from standard input
 - [ ] Input from CSV file
 - [ ] Input from binary file
-- [ ] Log axis
 - [ ] Drawing images

@@ -7,6 +7,8 @@ The library makes extensive use of [CRTP](https://en.wikipedia.org/wiki/Curiousl
 The initial idea was to allow user to write plots with chained member functions, this natually led to
 CRTP and static polymorphism as concepts embracing most of the classes.
 
+[Learn by example](examples)
+
 ## Getting started
 
 ### Cloning
@@ -38,7 +40,7 @@ make
 - [x] Plotting points
 - [x] Histograms
 - [x] Bar plots
-- [x] Grids
+- [x] Grids (some bugs yet to be fixed)
 - [ ] Input from standard input
 - [ ] Input from CSV file
 - [ ] Input from binary file

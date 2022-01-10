@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     ("H,height","Canvas maximum width. Assuming the height of the current console as default value.", cxxopts::value<int>())
     ("pen-line","Set the character to be used for drawing lines.", cxxopts::value<char>()->default_value(askiplot::kDefaultPenLine))
     ("pen-area","Set the character to be used for filling bars, or the area under curves.", cxxopts::value<char>()->default_value(askiplot::kDefaultPenArea))
-    ("pen-empty","Set the character to be used as background filler.", cxxopts::value<char>()->default_value(askiplot::kDefaultPenEmpty))
+    ("pen-empty","Set the character to be used as background filler.", cxxopts::value<char>()->default_value(askiplot::kDefaultPenBlank))
     ("f,fill","Fill area under the curve. Use option --pen-area to set a custom char.")
     ("V,version","Display software version.")
     ("h,help","Display this help message.")

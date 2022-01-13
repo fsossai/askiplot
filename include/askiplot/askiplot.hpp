@@ -369,9 +369,17 @@ public:
     return *this;
   }
 
-  Palette& SetBrush(const std::string& name, const std::string& value) {
+  Palette& SetBrush(const std::string name, const std::string& value) {
     Brush brush(name, value);
     return SetBrush(brush);
+  }
+
+  Palette& SetBrush(const std::vector<std::string>& names, const std::string& value) {
+    for (std::size_t i = 0; i < names.size(); ++i) {
+      std::cout << names[i] << std::endl;
+      SetBrush(Brush(names[i], value));
+    }
+    return *this;
   }
 
 private:
@@ -1003,13 +1011,13 @@ public:
 
   // Setters
 
-  Subtype& SetBrush(const Brush& brush) {
-    palette_(brush.GetName(), brush.GetValue());
+  Subtype& SetBrush(const std::string& name, const std::string& value) {
+    palette_(name, value);
     return static_cast<Subtype&>(*this);
   }
-
-  Subtype& SetBrush(const std::string& name, const std::string& value) {
-    return SetBrush(Brush(name, value));
+  
+  Subtype& SetBrush(const Brush& brush) {
+    return SetBrush(brush.GetName(), brush.GetValue());
   }
 
   Subtype& SetMainBrush(const std::string& value) {
@@ -1363,6 +1371,16 @@ class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
 template<class T>
 class GroupedBars {
 public:
+  GroupedBars(T& baseplot, int ngroups)
+      : baseplot_(baseplot)
+      , group_size_(1)
+      , ngroups_(ngroups) {
+    static_assert(std::is_base_of<__BarPlot<T>, T>::value,
+      "Template type T must be a subtype of __BarPlot<T>.");
+    xdata_.resize(ngroups);
+    std::fill_n(xdata_.begin(), ngroups, 1);
+  }
+
   template<class Tx>
   GroupedBars(T& baseplot, const std::vector<Tx>& xdata)
       : baseplot_(baseplot)
@@ -1389,6 +1407,12 @@ public:
     std::vector<double> ydata_double(nbars);
     std::transform(ydata.begin(), ydata.begin() + nbars, ydata_double.begin(),
                    [](const auto& y) -> double { return y; });
+
+    auto minmax = std::minmax_element(ydata_double.begin(), ydata_double.end());
+    const double current_min = *minmax.first;
+    const double current_max = *minmax.second;
+    baseplot_.SetYlimits(std::min(baseplot_.GetYlimBottom(), current_min),
+                         std::max(baseplot_.GetYlimTop(), current_max));
 
     metadata_.push_back(
       BarPlotMetadata{}.SetLabel(label)

@@ -156,3 +156,70 @@ West         | |                        Center                       a      East
 ................................................................................
 SouthWest    | |             Centered text at South                    SouthEast
 ```
+
+## Fusion
+
+[fusion.cpp]() demostrates the usefulness of the `Fusion` function and its flexibility given by the chained `operator()`.
+```C++
+auto box1 = Plot(10,5).Fill(".").DrawTextCentered("BOX1", Center);
+auto box2 = Plot(box1).DrawTextCentered("BOX2", Center);
+
+Plot p(60,15);
+p.Fusion()(box1, NorthWest)
+          (box1, SouthEast)
+          (box2, NorthEast)
+          (box2, SouthWest)
+          .Fuse()
+  .DrawLineHorizontalAtRow(0.5)
+  .DrawLineVerticalAtCol(0.5)
+;
+cout << p.Serialize();
+```
+Produces the following:
+```
+__________                    |                   __________
+|........|                    |                   |........|
+|..BOX1..|                    |                   |..BOX2..|
+|........|                    |                   |........|
+|........|                    |                   |........|
+                              |                             
+                              |                             
+------------------------------|-----------------------------
+                              |                             
+                              |                             
+__________                    |                   __________
+|........|                    |                   |........|
+|..BOX2..|                    |                   |..BOX1..|
+|........|                    |                   |........|
+|........|                    |                   |........|
+```
+
+## Grids
+[grid.cpp]() shows how to merge multiple plots into a simple grid.
+```C++
+int width = 10, height = 5;
+GridPlot gp(2, 3, 3 * width, 2 * height); // Rows, Columns, Width, Height
+Plot base = Plot(width, height).Fill().DrawBorders(All - Bottom);
+
+Plot sp1 = Plot(base).SetMainBrush("1").Redraw();
+Plot sp2 = Plot(base).SetMainBrush("2").Redraw();
+Plot sp3 = Plot(base).SetMainBrush("3").Redraw();
+
+gp.SetInRowMajor()(sp1)(sp2)(sp3)(sp3)(sp2)(sp1).Set();
+gp.Get<Plot>(1,2).DrawTextCentered("--", Center);
+
+cout << gp.Serialize();
+```
+Produces the following:
+```
+______________________________
+|11111111||22222222||33333333|
+|111--111||22222222||33333333|
+|11111111||22222222||33333333|
+|11111111||22222222||33333333|
+______________________________
+|33333333||22222222||11111111|
+|33333333||22222222||111--111|
+|33333333||22222222||11111111|
+|33333333||22222222||11111111|
+```

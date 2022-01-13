@@ -1,8 +1,6 @@
 #include "askiplot/askiplot.hpp"
 
 #include <iostream>
-#include <random>
-#include <unordered_map>
 
 using namespace std;
 using namespace askiplot;

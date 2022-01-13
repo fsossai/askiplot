@@ -1,6 +1,6 @@
 # Examples
 
-Compilation example:
+Compilation example from this directory:
 ```
 g++ -I../include -o example example.cpp
 ```

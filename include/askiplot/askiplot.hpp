@@ -20,7 +20,9 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <set>
@@ -288,7 +290,7 @@ public:
   Brush& SetValue(const std::string& value) {
     if (value.size() == 0) {
       throw InvalidBrushValue();
-    } else if (std::isprint(static_cast<unsigned char>(value[0]))) {
+    } else if (std::isprint(static_cast<uint8_t>(value[0]))) {
       value_.resize(1);
       value_[0] = value[0];
     } else if (value.size() == 1) {
@@ -1726,6 +1728,147 @@ private:
   int grid_rows_;
   int nplots_;
 };
+
+//********************************* Image ***********************************//
+
+class Image {
+public:
+  Image(const std::string& path) {
+    std::ifstream input(path, std::ios::binary);
+    input.unsetf(std::ios::skipws);
+    img_.insert(img_.begin(), std::istream_iterator<uint8_t>(input), {});
+  }
+  
+  int GetWidth() { return width_; }
+  int GetHeight() { return height_; }
+
+  int& At(int x, int y) { return img_[x * height_ + y]; }
+  const int& At(int x, int y) const { return img_[x * height_ + y]; }
+
+private:
+  int width_, height_;
+  std::vector<int> img_;
+};
+
+//******************************** Gamma ************************************//
+
+template<class Subtype>
+class __Gamma {
+public:
+  __Gamma() {
+  }
+
+  virtual ~__Gamma() = default;
+  virtual Brush operator()(uint8_t level) = 0;
+
+private:
+};
+
+//****************************** FixedGamma *********************************//
+
+template<class Subtype>
+class __FixedGamma : public __Gamma<Subtype> {
+public:
+  __FixedGamma() {
+    recodedGamma_ = std::string(256, ' ');
+  }
+
+  __FixedGamma(const std::string& gamma) {
+    SetGamma(gamma);
+  }
+
+  Brush operator()(uint8_t level) {
+    return Brush("*", recodedGamma_[level]);
+  }
+
+  Subtype& Shuffle() {
+    std::random_shuffle(gamma_.begin(), gamma_.end());
+    return SetGamma(gamma_);
+  }
+
+  std::string GetGamma() const { return gamma_; }
+
+  Subtype& SetGamma(const std::string& gamma) {
+    std::size_t new_size = std::min<std::size_t>(gamma.size(), 256L);
+    gamma_.resize(new_size);
+    std::copy_n(gamma.begin(), new_size, gamma_.begin());
+
+    recodedGamma_.resize(256);
+    const int levels = gamma.size();
+    const int div = 256 / levels;
+    int rem = 256 % levels;
+
+    auto rgIt = recodedGamma_.begin();
+    for (int i = 0; i < levels; ++i) {
+      const int ncopies = div + ((rem > 0) ? 1 : 0);
+      rgIt = std::fill_n(rgIt, ncopies, gamma[i]);
+      rem--;
+    }
+
+    return static_cast<Subtype&>(*this);
+  }
+
+private:
+  std::string gamma_;
+  std::string recodedGamma_;
+};
+
+class FixedGamma final : public __FixedGamma<FixedGamma> { using __FixedGamma::__FixedGamma; };
+
+//***************************** RandomGamma *********************************//
+
+template<class Subtype>
+class __RandomGamma : public __Gamma<Subtype> {
+public:
+  __RandomGamma() {
+    SetZeroThreshold(128);
+    SetZeroBrush(" ");
+  }
+
+  __RandomGamma(const std::string& gamma)
+      : __RandomGamma() {
+    SetGamma(gamma);
+  }
+
+  Brush operator()(uint8_t level) {
+    if (level < threshold_) {
+      return zero_;
+    }
+    return gamma_[rand() % gamma_.size()];
+  }
+
+  // Getters
+
+  std::string GetGamma() const { return gamma_; }
+  Brush GetZeroBrush() const { return zero_; }
+  uint8_t GetZeroThreshold() const { return threshold_; }
+
+  // Setters
+
+  Subtype& SetGamma(const std::string& gamma) {
+    std::size_t new_size = std::min<std::size_t>(gamma.size(), 256L);
+    gamma_.resize(new_size);
+    std::copy_n(gamma.begin(), new_size, gamma_.begin());
+    return static_cast<Subtype&>(*this);
+  }
+  Subtype& SetZeroBrush(Brush brush) {
+    brush.SetName("*");
+    zero_ = brush;
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& SetZeroThreshold(uint8_t t) {
+    threshold_ = t;
+    return static_cast<Subtype&>(*this);
+  }
+  
+private:
+  std::string gamma_;
+  uint8_t threshold_;
+  Brush zero_;
+};
+
+class RandomGamma final : public __RandomGamma<RandomGamma> { using __RandomGamma::__RandomGamma; };
 
 //***************************** Free functions ******************************//
 

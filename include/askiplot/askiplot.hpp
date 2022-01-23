@@ -1755,13 +1755,9 @@ private:
 template<class Subtype>
 class __Gamma {
 public:
-  __Gamma() {
-  }
-
+  __Gamma() = default;
   virtual ~__Gamma() = default;
   virtual Brush operator()(uint8_t level) = 0;
-
-private:
 };
 
 //****************************** FixedGamma *********************************//
@@ -1777,7 +1773,7 @@ public:
     SetGamma(gamma);
   }
 
-  Brush operator()(uint8_t level) {
+  Brush operator()(uint8_t level) override {
     return Brush("*", recodedGamma_[level]);
   }
 
@@ -1808,49 +1804,30 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-private:
+protected:
   std::string gamma_;
   std::string recodedGamma_;
 };
 
 class FixedGamma final : public __FixedGamma<FixedGamma> { using __FixedGamma::__FixedGamma; };
 
-//***************************** RandomGamma *********************************//
+//**************************** VariableGamma ********************************//
 
 template<class Subtype>
-class __RandomGamma : public __Gamma<Subtype> {
+class __VariableGamma : public __Gamma<Subtype> {
 public:
-  __RandomGamma() {
+  __VariableGamma() {
     SetZeroThreshold(128);
     SetZeroBrush(" ");
   }
 
-  __RandomGamma(const std::string& gamma)
-      : __RandomGamma() {
-    SetGamma(gamma);
-  }
-
-  Brush operator()(uint8_t level) {
-    if (level < threshold_) {
-      return zero_;
-    }
-    return gamma_[rand() % gamma_.size()];
-  }
-
   // Getters
 
-  std::string GetGamma() const { return gamma_; }
   Brush GetZeroBrush() const { return zero_; }
   uint8_t GetZeroThreshold() const { return threshold_; }
 
   // Setters
 
-  Subtype& SetGamma(const std::string& gamma) {
-    std::size_t new_size = std::min<std::size_t>(gamma.size(), 256L);
-    gamma_.resize(new_size);
-    std::copy_n(gamma.begin(), new_size, gamma_.begin());
-    return static_cast<Subtype&>(*this);
-  }
   Subtype& SetZeroBrush(Brush brush) {
     brush.SetName("*");
     zero_ = brush;
@@ -1862,13 +1839,81 @@ public:
     return static_cast<Subtype&>(*this);
   }
   
-private:
-  std::string gamma_;
+protected:
   uint8_t threshold_;
   Brush zero_;
 };
 
+//****************************** RandomGamma ********************************//
+
+template<class Subtype>
+class __RandomGamma : public __VariableGamma<Subtype> {
+public:
+  __RandomGamma(const std::string& gamma) {
+    SetGamma(gamma);
+  }
+
+  Brush operator()(uint8_t level) override {
+    if (level < this->threshold_) {
+      return this->zero_;
+    }
+    return gamma_[rand() % gamma_.size()];
+  }
+
+  std::string GetGamma() const { return gamma_; }
+  
+  Subtype& SetGamma(const std::string& gamma) {
+    std::size_t new_size = std::min<std::size_t>(gamma.size(), 256L);
+    gamma_.resize(new_size);
+    std::copy_n(gamma.begin(), new_size, gamma_.begin());
+    return static_cast<Subtype&>(*this);
+  }
+  
+protected:
+  std::string gamma_;
+};
+
 class RandomGamma final : public __RandomGamma<RandomGamma> { using __RandomGamma::__RandomGamma; };
+
+//******************************* TextGamma *********************************//
+
+template<class Subtype>
+class __TextGamma : public __VariableGamma<Subtype> {
+public:
+  __TextGamma() {
+    text_ = "AskiPlot";
+  }
+
+  __TextGamma(const std::string& text) {
+    SetText(text);
+  }
+
+  Brush operator()(uint8_t level) {
+    if (level < this->threshold_) {
+      return this->zero_;
+    }
+    return text_[use_count_++ % text_.size()];
+  }
+
+  // Getters
+  std::string GetText() const { return text_; }
+
+  // Setters
+  Subtype& SetText(const std::string& text) {
+    text_ = text;
+    if (text.size() == 0) {
+      text_ = " ";
+    }
+    return static_cast<Subtype&>(*this);
+  }
+
+protected:
+  std::string text_;
+  int use_count_ = 0;
+  bool repeat_;
+};
+
+class TextGamma final : public __TextGamma<TextGamma> { using __TextGamma::__TextGamma; };
 
 //***************************** Free functions ******************************//
 

@@ -76,6 +76,13 @@ public:
   }
 };
 
+class BMPFormatNotSupported : public std::exception {
+public:
+  virtual const char* what() const noexcept override {
+    return "BMP format not supported";
+  }
+};
+
 //******************************* Enumerators *******************************//
 
 enum Borders : char {
@@ -1729,25 +1736,148 @@ private:
   int nplots_;
 };
 
+//******************************* BMPImage **********************************//
+
+struct BMPImage {
+  int size;
+  int reserved;
+  int offset;
+  int header_length;
+  int width;
+  int height;
+  int16_t planes;
+  int16_t bits_per_pixel;
+  int compression;
+  int raw_size;
+  int vertical_resolution;
+  int horizontal_resolution;
+  int colors;
+  int important_colors;
+};
+
 //********************************* Image ***********************************//
 
 class Image {
 public:
-  Image(const std::string& path) {
+  explicit Image(const std::string& path) {
     std::ifstream input(path, std::ios::binary);
     input.unsetf(std::ios::skipws);
-    img_.insert(img_.begin(), std::istream_iterator<uint8_t>(input), {});
+    raw_.insert(raw_.begin(), std::istream_iterator<uint8_t>(input), {});
+
+    // Parsing
+    std::string format = "XX";
+    format[0] = raw_[0];
+    format[1] = raw_[1];
+    if (!CheckFormat(format)) {
+      throw BMPFormatNotSupported();
+    }
+
+    data_ = reinterpret_cast<BMPImage*>(raw_.data() + 2);
+    if (data_->height < 0 || data_->width < 0) {
+      throw BMPFormatNotSupported();
+    }
+    width_ = data_->width;
+    height_ = data_->height;
+    img_.resize(width_ * height_);
+    std::cout << data_->bits_per_pixel << std::endl;
+    std::cout << data_->raw_size << std::endl;
+
+    ParsePayload();
   }
   
-  int GetWidth() { return width_; }
-  int GetHeight() { return height_; }
+  int GetWidth() const { return data_->width; }
+  int GetHeight() const { return data_->height; }
 
-  int& At(int x, int y) { return img_[x * height_ + y]; }
-  const int& At(int x, int y) const { return img_[x * height_ + y]; }
+  int& At(int x, int y) { return img_[x + y * width_]; }
+  const int& At(int x, int y) const { return img_[x + y * width_]; }
 
 private:
-  int width_, height_;
   std::vector<int> img_;
+  std::vector<uint8_t> raw_;
+  int width_, height_;
+  BMPImage *data_ = nullptr;
+
+  bool CheckFormat(const std::string& fmt) {
+    if (fmt == "BM" || fmt == "BA" || fmt == "CI" || fmt == "CP" ||
+        fmt == "IC" || fmt == "PC") {
+      return true;
+    }
+    return false;
+  }
+
+  void ParsePayload() {
+    switch (data_->bits_per_pixel) {
+      case 1:
+        ParsePayload_1();
+        break;
+      case 24:
+        ParsePayload_24();
+        break;
+      case 32:
+        ParsePayload_32();
+        break;
+      default:;
+        throw BMPFormatNotSupported();
+    }
+  }
+
+  void ParsePayload_1() {
+    uint8_t *current = &(raw_.data()[data_->offset]);
+    int img_idx = 0;
+    const int full_bytes = width_ / 8;
+    const int residual_bits = width_ - full_bytes * 8;
+    const int skip = residual_bits / 8;
+    for (int i = 0; i < height_; ++i) {
+      uint8_t temp;
+      for (int j = 0; j < full_bytes; ++j) {
+        temp = *current;
+        img_[img_idx++] = !!(temp & 0x80) * 255;
+        img_[img_idx++] = !!(temp & 0x40) * 255;
+        img_[img_idx++] = !!(temp & 0x20) * 255;
+        img_[img_idx++] = !!(temp & 0x10) * 255;
+        img_[img_idx++] = !!(temp & 0x08) * 255;
+        img_[img_idx++] = !!(temp & 0x04) * 255;
+        img_[img_idx++] = !!(temp & 0x02) * 255;
+        img_[img_idx++] = !!(temp & 0x01) * 255;
+        ++current;
+      }
+      temp = *current;
+      uint8_t mask = 0x80;
+      for (int j = 0; j < residual_bits; ++j) {
+        img_[img_idx++] = !!(temp & mask) * 255;
+        mask >>= 1;
+      }
+      current += skip;
+    }
+  }
+
+  void ParsePayload_24() {
+    uint8_t *current = reinterpret_cast<uint8_t*>(&(raw_.data()[data_->offset]));
+    int img_idx = 0;
+    const int skip = 4 - ((width_ * 3) % 4);
+    for (int i = 0; i < height_; ++i) {
+      for (int j = 0; j < width_; ++j) {
+        img_[img_idx++] = (static_cast<uint32_t>(*(current + 0)) +
+                           static_cast<uint32_t>(*(current + 1)) +
+                           static_cast<uint32_t>(*(current + 2))) / 3.0;
+        current += 3;
+      }
+      current += skip;
+    }
+  }
+
+  void ParsePayload_32() {
+    uint8_t *current = reinterpret_cast<uint8_t*>(&(raw_.data()[data_->offset]));
+    int img_idx = 0;
+    for (int i = 0; i < height_; ++i) {
+      for (int j = 0; j < width_; ++j) {
+        img_[img_idx++] = (static_cast<uint32_t>(*(current + 0)) +
+                           static_cast<uint32_t>(*(current + 1)) +
+                           static_cast<uint32_t>(*(current + 2))) / 3.0;
+        current += 4;
+      }
+    }
+  }
 };
 
 //******************************** Gamma ************************************//

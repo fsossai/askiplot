@@ -463,7 +463,7 @@ public:
   }
 
   __FixedGamma() {
-    SetGamma(" .o0@#");
+    SetGamma(" .o0#@");
   }
 
   Brush operator()(uint8_t level) override {
@@ -657,13 +657,58 @@ public:
     ParsePayload();
   }
   
-  int GetWidth() const { return data_->width; }
-  int GetHeight() const { return data_->height; }
+  int GetWidth() const { return width_; }
+  int GetHeight() const { return height_; }
 
   int& At(int x, int y) { return img_[x + y * width_]; }
   const int& At(int x, int y) const { return img_[x + y * width_]; }
 
   Image& Resize(int new_width, int new_height) {
+    if (new_width > width_ || new_height > height_) {
+      return *this;
+    }
+
+    std::vector<double> sums(new_width * new_height);
+
+    const int div_w = width_ / new_width;
+    const int div_h = height_ / new_height;
+    const int rem_w = width_ % new_width;
+    const int rem_h = height_ % new_height;
+    int block_i_offset = 0;
+
+    for (int i = 0; i < new_height; ++i) {
+      const int block_i_len = div_h + (i < rem_h);
+      int block_j_offset = 0;
+      for (int j = 0; j < new_width; ++j) {
+        const int block_j_len = div_w + (j < rem_w);
+        const int sums_idx = j + i * new_width;
+        for (int block_i = 0; block_i < block_i_len; ++block_i) {
+          for (int block_j = 0; block_j < block_j_len; ++block_j) {
+            sums[sums_idx] += At(block_j_offset + block_j, block_i_offset + block_i);
+          }
+        }
+        sums[sums_idx] /= static_cast<double>(block_i_len * block_j_len);
+        block_j_offset += block_j_len;
+      }
+      block_i_offset += block_i_len;
+    }
+
+    img_.resize(sums.size());
+    std::transform(sums.begin(),
+                   sums.end(),
+                   img_.begin(),
+                   [](double x) -> int { return x;});
+
+    width_ = new_width;
+    height_ = new_height;
+
+    return *this;
+  }
+
+  Image& Resize(double ratio) {
+    if (ratio >= 1.0) {
+      return *this;
+    }
     return *this;
   }
 
@@ -921,6 +966,8 @@ public:
     const int len_w = std::min(img.GetWidth(), img_width);
     const int len_h = std::min(img.GetHeight(), img_height);
     __Plot subplot(len_w, len_h);
+    std::cout << "len_w: " << len_w << std::endl;
+    std::cout << "len_h: " << len_h << std::endl;
 
     for (int j = len_h - 1; j >= 0; --j) {
       for (int i = 0; i < len_w; ++i) {
@@ -935,15 +982,7 @@ public:
   Subtype& DrawImage(const Image& img,
                      T gamma = {},
                      const Position& position = {0,0}) {
-    if (img.GetWidth() > width_ || img.GetHeight() > height_) {
-      double ratio_x = 1.0 * img.GetWidth() / width_;
-      double ratio_y = 1.0 * img.GetHeight() / height_;
-      double ratio = std::max(ratio_x, ratio_y);
-      int new_width = img.GetWidth() / ratio;
-      int new_height = img.GetHeight() / ratio;
-      return DrawImage(img, gamma, position, new_width, new_height);
-    }
-    return DrawImage(img, gamma, position, img.GetWidth(), img.GetHeight());
+    return DrawImage(img, gamma, position, width_, height_);
   }
 
   Subtype& DrawLegend(const Position& position = NorthEast) {

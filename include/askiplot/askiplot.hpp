@@ -663,6 +663,12 @@ public:
   int& At(int x, int y) { return img_[x + y * width_]; }
   const int& At(int x, int y) const { return img_[x + y * width_]; }
 
+  Image& Invert() {
+    std::transform(img_.begin(), img_.end(), img_.begin(),
+      [](int level) { return 255 - level; });
+    return *this;
+  }
+
   Image& Resize(int new_width, int new_height) {
     if (new_width > width_ || new_height > height_) {
       return *this;

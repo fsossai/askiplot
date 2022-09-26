@@ -44,4 +44,4 @@ make
 - [ ] Input from standard input
 - [ ] Input from CSV file
 - [ ] Input from binary file
-- [ ] Drawing images
+- [x] Drawing images

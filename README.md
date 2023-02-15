@@ -22,26 +22,29 @@ Otherwise, if you only want to use the **library**, there is no need for externa
 ```
 git clone https://github.com/fsossai/AskiPlot
 ```
-or directly download the C++ header file:
-```
-wget https://github.com/fsossai/AskiPlot/raw/master/include/AskiPlot/AskiPlot.hpp
-```
+or directly download the C++ header file located [here](include/AskiPlot/AskiPlot.hpp).
+
 ### Compiling
 Compilation is required only for being able to the command-line tool.
 ```
-cd AskiPlot
-mkdir build && cd build
-cmake .. -B.
+mkdir build
+cd build
+cmake ..
 make
 ```
 
-## Features / Implementation status
+## TODO list
 
 - [x] Plotting points
 - [x] Histograms
 - [x] Bar plots
-- [x] Grids (some bugs yet to be fixed)
+- [x] Grids (there are some known bugs)
+- [ ] Automatic number of digits in bar names
+- [ ] Optional brushes for bar plots
 - [ ] Input from standard input
 - [ ] Input from CSV file
 - [ ] Input from binary file
 - [x] Drawing images
+- [ ] Add examples for drawing images
+- [ ] Grouped bars normalized to an arbitrary baseline
+- [ ] Moving some usage examples to the main readme

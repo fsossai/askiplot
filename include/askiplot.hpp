@@ -21,7 +21,6 @@
 
 #include <algorithm>
 #include <fstream>
-#include <iostream>
 #include <iterator>
 #include <limits>
 #include <numeric>
@@ -304,7 +303,11 @@ public:
       value_.resize(1);
       value_[0] = value[0];
     } else if (value.size() == 1) {
-      throw InvalidBrushValue();
+      if (value[0] == '\t' || value[0] == '\n' || value[0] == '\r') {
+        value_[0] = ' ';
+      } else {
+        throw InvalidBrushValue();
+      }
     } else {
       value_.resize(2);
       value_[0] = value[0];
@@ -390,7 +393,6 @@ public:
 
   Palette& SetBrush(const std::vector<std::string>& names, const std::string& value) {
     for (std::size_t i = 0; i < names.size(); ++i) {
-      std::cout << names[i] << std::endl;
       SetBrush(Brush(names[i], value));
     }
     return *this;
@@ -656,8 +658,6 @@ public:
     width_ = data_->width;
     height_ = data_->height;
     img_.resize(width_ * height_);
-    std::cout << data_->bits_per_pixel << std::endl;
-    std::cout << data_->raw_size << std::endl;
 
     ParsePayload();
   }
@@ -977,8 +977,6 @@ public:
     const int len_w = std::min(img.GetWidth(), img_width);
     const int len_h = std::min(img.GetHeight(), img_height);
     __Plot subplot(len_w, len_h);
-    std::cout << "len_w: " << len_w << std::endl;
-    std::cout << "len_h: " << len_h << std::endl;
 
     for (int j = len_h - 1; j >= 0; --j) {
       for (int i = 0; i < len_w; ++i) {
@@ -1224,7 +1222,7 @@ public:
       for (int j = cut_out; j < n; ++j) {
         At(col, row - j) = Brush("*", text[j]);
       }
-    } else { std::cout << col << "\t" << row << std::endl; }
+    } 
     return static_cast<Subtype&>(*this);
   }
 

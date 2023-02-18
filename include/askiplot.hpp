@@ -318,6 +318,8 @@ private:
   std::string value_;
 };
 
+//********************************* Palette *********************************//
+
 class Palette {
 public:
   Palette() {
@@ -1596,6 +1598,8 @@ private:
   T& baseplot_;
   std::vector<std::pair<const IPlot*, Offset>> plots_offsets_;
 };
+
+//*********************************** Bar ***********************************//
 
 class Bar {
 public:

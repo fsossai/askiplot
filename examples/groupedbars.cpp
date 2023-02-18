@@ -1,6 +1,5 @@
-#include "askiplot/askiplot.hpp"
-
 #include <iostream>
+#include <askiplot.hpp>
 
 using namespace std;
 using namespace askiplot;

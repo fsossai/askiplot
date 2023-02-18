@@ -31,11 +31,14 @@
 #include <vector>
 #include <unordered_map>
 
-#define ASKIPLOT_VERSION_MAJOR 0
-#define ASKIPLOT_VERSION_MINOR 1
-#define ASKIPLOT_VERSION_PATCH 0
 
 namespace askiplot {
+
+//********************************* Version *********************************//
+
+constexpr int ASKIPLOT_VERSION_MAJOR = 0;
+constexpr int ASKIPLOT_VERSION_MINOR = 2;
+constexpr int ASKIPLOT_VERSION_PATCH = 0;
 
 //************************** Defauts and constants **************************//
 

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <askiplot.hpp>
 
 using namespace std;

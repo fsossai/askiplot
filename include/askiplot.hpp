@@ -470,7 +470,7 @@ public:
   }
 
   __FixedGamma() {
-    SetGamma(" .o0#@");
+    SetGamma("  ..oo00#@");
   }
 
   Brush operator()(uint8_t level) override {

@@ -11,8 +11,7 @@ Unless otherwise specified, the library will infere a canvas size that fits the 
 
 ## Usage examples
 
-Run `make` to compile all the examples.
-Check out [examples](examples) for more details.
+Run `make` in the [examples](examples) directory to compile all the examples.
 
 ### Grouped bars
 

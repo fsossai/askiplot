@@ -7,3 +7,4 @@
 - [ ] Subplots / Views
 - [ ] Simplify the use of `GroupedBars`
 - [ ] Add default `Brush` for `GroupedBars`
+- [ ] `BarPlot` should have a _value_ and a _name_ for each bar

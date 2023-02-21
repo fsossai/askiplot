@@ -12,7 +12,8 @@ using namespace askiplot;
 int main() {
   Plot p;
   Image turing("turing.bmp");
-  RandomGamma gamma("01");
+  RandomGamma gamma("abcdefghijklmnopqrstuvwxyz");
+  //RandomGamma gamma("01");
 
   int zt = 0;
   int step = 5;

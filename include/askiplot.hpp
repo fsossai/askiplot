@@ -1738,7 +1738,7 @@ public:
     const auto max_y = *minmax_y.second;
 
     this->SetXlimits(min_x - min_diff, max_x + min_diff);
-    this->SetYlimits(std::min(0, min_y), max_y * 1.05);
+    this->SetYlimits(std::min(static_cast<Ty>(0), min_y), max_y * 1.05);
 
     const double xlim_left = this->GetXlimLeft();
     const double xlim_right = this->GetXlimRight();

@@ -1722,7 +1722,7 @@ public:
   Subtype& PlotBars(const std::vector<Tx>& xdata,
                     const std::vector<Ty>& ydata,
                     const std::string& label = "",
-                    const Brush& brush = Brush(DefaultBrushArea)) {
+                    const Brush& brush = Brush("Area", DefaultBrushArea)) {
     auto xdata_s = xdata;
     std::sort(xdata_s.begin(), xdata_s.end(), std::less<Tx>());
     std::vector<Tx> diffs(xdata_s.size());
@@ -1772,7 +1772,7 @@ public:
   template<class Ty>
   Subtype& PlotBars(const std::vector<Ty>& ydata,
                     const std::string& label = "",
-                    const Brush& brush = Brush(DefaultBrushArea)) {
+                    const Brush& brush = Brush("Area", DefaultBrushArea)) {
     auto xdata = std::vector<Ty>(ydata.size());
     std::iota(xdata.begin(), xdata.end(), 1);
     return PlotBars(xdata, ydata, label, brush);

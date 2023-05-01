@@ -23,6 +23,7 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <set>
 #include <sstream>
@@ -1769,6 +1770,23 @@ public:
     return PlotBars(std::move(bars));
   }
 
+  template<class Tx, class Ty>
+  Subtype& PlotBars(const std::map<Tx, Ty>& data,
+                    const std::string& label = "",
+                    const Brush& brush = Brush("Area", DefaultBrushArea)) {
+    std::vector<Tx> xdata;
+    std::vector<Ty> ydata;
+    xdata.reserve(data.size());
+    ydata.reserve(data.size());
+
+    for (auto &[x, y] : data) {
+      xdata.push_back(x);
+      ydata.push_back(y);
+    }
+
+    return PlotBars(xdata, ydata, label, brush);
+
+  }
   template<class Ty>
   Subtype& PlotBars(const std::vector<Ty>& ydata,
                     const std::string& label = "",

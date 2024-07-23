@@ -36,9 +36,11 @@ namespace askiplot {
 
 //********************************* Version *********************************//
 
-constexpr int ASKIPLOT_VERSION_MAJOR = 0;
-constexpr int ASKIPLOT_VERSION_MINOR = 2;
-constexpr int ASKIPLOT_VERSION_PATCH = 0;
+static constexpr struct {
+  int major, minor, patch;
+} version = {
+  0, 2, 0
+};
 
 //************************** Defauts and constants **************************//
 

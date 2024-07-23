@@ -16,21 +16,21 @@
 #ifndef ASKIPLOT_HPP_
 #define ASKIPLOT_HPP_
 
-#include <sys/ioctl.h>
-#include <unistd.h>
-
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <numeric>
+#include <random>
 #include <set>
 #include <sstream>
 #include <string>
-#include <vector>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include <unordered_map>
-
+#include <vector>
 
 namespace askiplot {
 
@@ -479,7 +479,9 @@ public:
   }
 
   Subtype& Shuffle() {
-    std::random_shuffle(gamma_.begin(), gamma_.end());
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(gamma_.begin(), gamma_.end(), g);
     return SetGamma(gamma_);
   }
 
@@ -1042,8 +1044,8 @@ public:
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
    
-    auto to_col = [=](double x) -> int { return (x - xlim_left_  ) / xstep; };
-    auto to_row = [=](double y) -> int { return (y - ylim_bottom_) / ystep; };
+    auto to_col = [&](double x) -> int { return (x - xlim_left_  ) / xstep; };
+    auto to_row = [&](double y) -> int { return (y - ylim_bottom_) / ystep; };
    
     const int col_beg = to_col(x_begin);
     const int row_beg = to_row(y_begin);
@@ -1078,8 +1080,8 @@ public:
     const double xstep = (xlim_right_ - xlim_left_) / width_;
     const double ystep = (ylim_top_ - ylim_bottom_) / height_;
     
-    auto to_x = [=](int col) -> double { return col * xstep + xlim_left_; };
-    auto to_y = [=](int row) -> double { return row * ystep + ylim_bottom_; };
+    auto to_x = [&](int col) -> double { return col * xstep + xlim_left_; };
+    auto to_y = [&](int row) -> double { return row * ystep + ylim_bottom_; };
 
     auto pos_beg_abs = GetAbsolutePosition(begin);
     auto pos_end_abs = GetAbsolutePosition(end);

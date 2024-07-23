@@ -14,9 +14,9 @@ int main() {
 
   while (true) {
     if (rand() % 2) {
-      p.DrawLineVerticalAtCol((float)rand() / RAND_MAX);
+      p.DrawLineVerticalAtCol((float)rand() / (float)RAND_MAX);
     } else {
-      p.DrawLineHorizontalAtRow((float)rand() / RAND_MAX);
+      p.DrawLineHorizontalAtRow((float)rand() / (float)RAND_MAX);
     }
 
     p.Fusion()(box, Center - Offset(box.GetWidth()/2, box.GetHeight()/2)).Fuse();

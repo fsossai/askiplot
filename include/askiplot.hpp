@@ -42,6 +42,16 @@ static constexpr struct {
   0, 2, 0
 };
 
+//********************** Free functions declaration *************************//
+
+class Brush;
+
+template<class T>
+T BlankLike(const T& plot);
+std::vector<Brush> StringToBrushes(const std::string& str);
+std::vector<Brush> StringToBrushes(const char *str);
+
+
 //************************** Defaults and constants *************************//
 
 std::string DefaultBrushMain = "_";
@@ -53,8 +63,11 @@ std::string DefaultBrushBorderLeft = "|";
 std::string DefaultBrushBorderRight = "|";
 std::string DefaultBrushLineHorizontal = "-";
 std::string DefaultBrushLineVertical = "|";
-const int kConsoleHeight = 0;
-const int kConsoleWidth = 0;
+const std::vector<Brush> kLetterBrushes = StringToBrushes("abcdefghijklmnopqrstuvwxyz");
+const std::vector<Brush> kNumberBrushes = StringToBrushes("0123456789");
+const std::vector<Brush> kSymbolBrushes = StringToBrushes("@$*#.+&*=?,-%!^\"<~>'");
+const int kConsoleHeight = 40;
+const int kConsoleWidth = 80;
 
 //******************************* Exceptions ********************************//
 
@@ -1783,13 +1796,14 @@ class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
 template<class T>
 class GroupedBars {
 public:
-  GroupedBars(T& baseplot)
+  GroupedBars(T& baseplot, std::vector<Brush> brushes = kSymbolBrushes)
       : baseplot_(baseplot)
       , group_size_(0)
-      , ngroups_(0) {
+      , ngroups_(0)
+      , brushes_(brushes)
+      , brush_index_(0) {
     static_assert(std::is_base_of<__BarPlot<T>, T>::value,
       "Template type T must be a subtype of __BarPlot<T>.");
-    // std::fill_n(xdata_.begin(), ngroups_, 1);
   }
 
   template<class Ty>
@@ -1826,6 +1840,12 @@ public:
                     .SetLabel(label)
     );
     return *this;
+  }
+
+  template<class Ty>
+  GroupedBars& Add(const std::vector<Ty>& ydata,
+                   const std::string& label) {
+    return Add(ydata, label, brushes_[brush_index_++ % brushes_.size()]); 
   }
 
   T& Commit(double height_resize = 0.8) {
@@ -1870,6 +1890,8 @@ private:
   int ngroups_;
   std::vector<std::string> xdata_;
   std::vector<BarPlotMetadata> metadata_;
+  std::vector<Brush> brushes_;
+  int brush_index_;
 };
 
 //******************************** HistPlot *********************************//
@@ -2135,6 +2157,18 @@ T BlankLike(const T& plot) {
   static_assert(std::is_base_of<__Plot<T>, T>::value,
     "Template type T must be a subtype of __Plot<T>.");
   return T(plot.GetWidth(), plot.GetHeight());
+}
+
+std::vector<Brush> StringToBrushes(const std::string& str) {
+  std::vector<Brush> brushes;
+  for (auto c : str) {
+    brushes.push_back(Brush("*", c));
+  }
+  return brushes;
+}
+
+std::vector<Brush> StringToBrushes(const char *str) {
+  return StringToBrushes(std::string(str));
 }
 
 } // namespace askiplot

@@ -6,10 +6,7 @@ using namespace std;
 using namespace askiplot;
 
 int main() {
-  Plot p;
-  Image turing("turing.bmp");
-  p.DrawImage(turing);
-  cout << p.Serialize();
+  cout << Plot{}.DrawImage(Image("turing.bmp")).Serialize();
 
   return 0;
 }

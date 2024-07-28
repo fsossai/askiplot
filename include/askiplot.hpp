@@ -643,7 +643,7 @@ struct BMPImage {
 
 class Image {
 public:
-  explicit Image(const std::string& path) {
+  Image(const std::string& path) {
     std::ifstream input(path, std::ios::binary);
     input.unsetf(std::ios::skipws);
     raw_.insert(raw_.begin(), std::istream_iterator<uint8_t>(input), {});

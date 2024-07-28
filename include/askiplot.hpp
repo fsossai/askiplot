@@ -66,8 +66,6 @@ std::string DefaultBrushLineVertical = "|";
 const std::vector<Brush> kLetterBrushes = StringToBrushes("abcdefghijklmnopqrstuvwxyz");
 const std::vector<Brush> kNumberBrushes = StringToBrushes("0123456789");
 const std::vector<Brush> kSymbolBrushes = StringToBrushes("@$*#.+&*=?,-%!^\"<~>'");
-const int kConsoleHeight = 40;
-const int kConsoleWidth = 80;
 
 //******************************* Exceptions ********************************//
 
@@ -857,15 +855,15 @@ class __Gamma;
 template<class Subtype>
 class __Plot : public IPlot {
 public:
-  __Plot(int width = kConsoleWidth, int height = kConsoleHeight) {
+  __Plot(int width = 0, int height = 0) {
     if (width < 0 || height < 0) {
       throw InvalidPlotSize();
     }
-    if (width == kConsoleWidth || height == kConsoleHeight) {
+    if (width == 0 || height == 0) {
       struct winsize w;
       ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      if (width == kConsoleWidth) width_ = w.ws_col;
-      if (height == kConsoleHeight) height_ = w.ws_row - 1;
+      if (width == 0) width_ = w.ws_col;
+      if (height == 0) height_ = w.ws_row - 1;
     } else {
       width_ = width;
       height_ = height;
@@ -1620,13 +1618,13 @@ private:
 //********************************* BarPlot *********************************//
 
 // Forward declaration
-class GroupedBars;
+class BarGrouper;
 
 template<class Subtype>
 class __BarPlot : public __Plot<Subtype> {
-friend class GroupedBars;
+friend class BarGrouper;
 public:
-  __BarPlot(int width = kConsoleWidth, int height = kConsoleHeight)
+  __BarPlot(int width = 0, int height = 0)
       : __Plot<Subtype>(width, height) {
   }
 
@@ -1789,11 +1787,11 @@ protected:
 
 class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
 
-//******************************* GroupedBars *******************************//
+//******************************* BarGrouper ********************************//
 
-class GroupedBars {
+class BarGrouper {
 public:
-  GroupedBars(BarPlot& baseplot, std::vector<Brush> brushes = kSymbolBrushes)
+  BarGrouper(BarPlot& baseplot, std::vector<Brush> brushes = kSymbolBrushes)
       : baseplot_(baseplot)
       , group_size_(0)
       , ngroups_(0)
@@ -1802,7 +1800,7 @@ public:
   }
 
   template<class Ty>
-  GroupedBars& Add(const std::vector<Ty>& ydata,
+  BarGrouper& Add(const std::vector<Ty>& ydata,
                    const std::string& label,
                    const Brush& brush) {
     if ((group_size_ + 1) * ngroups_ - 1 <= baseplot_.GetWidth()) {
@@ -1838,7 +1836,7 @@ public:
   }
 
   template<class Ty>
-  GroupedBars& Add(const std::vector<Ty>& ydata,
+  BarGrouper& Add(const std::vector<Ty>& ydata,
                    const std::string& label) {
     return Add(ydata, label, brushes_[brush_index_++ % brushes_.size()]); 
   }
@@ -1894,7 +1892,7 @@ private:
 template<class Subtype>
 class __HistPlot : public __BarPlot<Subtype> { 
 public:
-  __HistPlot(int width = kConsoleWidth, int height = kConsoleHeight)
+  __HistPlot(int width = 0, int height = 0)
       : __BarPlot<Subtype>(width, height) {
     nbins_ = this->GetWidth();
   }
@@ -1970,7 +1968,7 @@ template<class Subtype>
 class __GridPlot : public __Plot<Subtype> {
 public:
   __GridPlot(int grid_rows, int grid_cols,
-             int width = kConsoleWidth, int height = kConsoleHeight)
+             int width = 0, int height = 0)
       : __Plot<Subtype>(width, height) {
     grid_rows_ = std::max(0, grid_rows);
     grid_cols_ = std::max(0, grid_cols);
@@ -1992,7 +1990,7 @@ public:
   }
 
   __GridPlot(std::vector<int> subplot_widths, std::vector<int> subplot_heights,
-             int width = kConsoleWidth, int height = kConsoleHeight)
+             int width = 0, int height = 0)
       : __Plot<Subtype>(width, height)
       , subp_widths_(subplot_widths)
       , subp_heights_(subplot_heights) {

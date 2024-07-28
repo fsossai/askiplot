@@ -15,16 +15,14 @@ Run `make` in the [examples](examples) directory to compile all the examples.
 
 ### Grouped bars
 
-[groupedbars.cpp](examples/groupedbars.cpp) uses the class `GroupedBars` to group multiple sources in a single `BarPlot`.
+[bar_grouper.cpp](examples/bar_grouper.cpp) uses the class `BarGrouper` to group multiple sources in a single `BarPlot`.
 ```C++
 BarPlot bp;
-auto gb = GroupedBars<BarPlot>(bp, 2);
-gb
-  (vector<int>{80,40}, "Data Source 1", Brush('@'))
-  (vector<int>{20,50}, "Data Source 2", Brush('$'))
-  (vector<int>{10,20}, "Data Source 3", Brush('.'))
-  .Plot()
-;
+BarGrouper(bp, askiplot::kSymbolBrushes)
+  .Add(vector<int>{80,40}, "Data Source 1")
+  .Add(vector<int>{20,50}, "Data Source 2", Brush('x'))
+  .Add(vector<int>{10,20}, "Data Source 3")
+  .Commit();
 bp
   .DrawBarLabels(Offset(0,1))
   .DrawLegend()
@@ -38,26 +36,28 @@ Produces the following:
 ////////////////////////////////////////////////////////////////////////////////
                                                             ___________________|
                                                             | @ Data Source 1 ||
-    80                                                      | $ Data Source 2 ||
- ________                                                   | . Data Source 3 ||
-|@@@@@@@@|                                                  |_________________||
-|@@@@@@@@|                                                                     |
-|@@@@@@@@|                                                                     |
-|@@@@@@@@|                                                                     |
-|@@@@@@@@|                                                                     |
-|@@@@@@@@|                                            50                       |
-|@@@@@@@@|                                         ________                    |
-|@@@@@@@@|                                        |$$$$$$$$|                   |
-|@@@@@@@@|                                  40    |$$$$$$$$|                   |
-|@@@@@@@@|                               ________ |$$$$$$$$|                   |
-|@@@@@@@@|                              |@@@@@@@@||$$$$$$$$|                   |
-|@@@@@@@@|                              |@@@@@@@@||$$$$$$$$|                   |
-|@@@@@@@@|    20                        |@@@@@@@@||$$$$$$$$|    20             |
-|@@@@@@@@| ________                     |@@@@@@@@||$$$$$$$$| ________          |
-|@@@@@@@@||$$$$$$$$|                    |@@@@@@@@||$$$$$$$$||........|         |
-|@@@@@@@@||$$$$$$$$|    10              |@@@@@@@@||$$$$$$$$||........|         |
-|@@@@@@@@||$$$$$$$$| ________           |@@@@@@@@||$$$$$$$$||........|         |
-|@@@@@@@@||$$$$$$$$||........|          |@@@@@@@@||$$$$$$$$||........|         |
+    80                                                      | x Data Source 2 ||
+ _________                                                  | $ Data Source 3 ||
+|@@@@@@@@@|                                                 |_________________||
+|@@@@@@@@@|                                                                    |
+|@@@@@@@@@|                                                                    |
+|@@@@@@@@@|                                                                    |
+|@@@@@@@@@|                                                                    |
+|@@@@@@@@@|                                                                    |
+|@@@@@@@@@|                                                50                  |
+|@@@@@@@@@|                                             _________              |
+|@@@@@@@@@|                                            |xxxxxxxxx|             |
+|@@@@@@@@@|                                     40     |xxxxxxxxx|             |
+|@@@@@@@@@|                                  _________ |xxxxxxxxx|             |
+|@@@@@@@@@|                                 |@@@@@@@@@||xxxxxxxxx|             |
+|@@@@@@@@@|                                 |@@@@@@@@@||xxxxxxxxx|             |
+|@@@@@@@@@|                                 |@@@@@@@@@||xxxxxxxxx|             |
+|@@@@@@@@@|    20                           |@@@@@@@@@||xxxxxxxxx|    20       |
+|@@@@@@@@@| _________                       |@@@@@@@@@||xxxxxxxxx| _________   |
+|@@@@@@@@@||xxxxxxxxx|    10                |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|  |
+|@@@@@@@@@||xxxxxxxxx| _________            |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|  |
+|@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|           |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|  |
+|@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|           |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|  |
 ```
 
 ### Histograms

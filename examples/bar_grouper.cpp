@@ -7,12 +7,11 @@ using namespace std;
 using namespace askiplot;
 
 int main() {
-  BarPlot bp;
-  auto gb = GroupedBars(bp);
-  gb
-    .Add(vector<int>{80,40}, "Data Source 1", Brush('@'))
-    .Add(vector<int>{20,50}, "Data Source 2", Brush('$'))
-    .Add(vector<int>{10,20}, "Data Source 3", Brush('.'))
+  BarPlot bp(80, 25);
+  BarGrouper(bp, askiplot::kSymbolBrushes)
+    .Add(vector<int>{80,40}, "Data Source 1")
+    .Add(vector<int>{20,50}, "Data Source 2", Brush('x'))
+    .Add(vector<int>{10,20}, "Data Source 3")
     .Commit();
   bp
     .DrawBarLabels(Offset(0,1))
@@ -20,7 +19,6 @@ int main() {
     .SetBrush("BorderTop", "/")
     .DrawBorders(Top + Right)
   ;
-  // Drawing everthing
   cout << bp.Serialize();
   
   return 0;

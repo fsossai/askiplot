@@ -1783,26 +1783,13 @@ class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
 template<class T>
 class GroupedBars {
 public:
-  GroupedBars(T& baseplot, int ngroups)
+  GroupedBars(T& baseplot)
       : baseplot_(baseplot)
-      , group_size_(1)
-      , ngroups_(ngroups) {
+      , group_size_(0)
+      , ngroups_(0) {
     static_assert(std::is_base_of<__BarPlot<T>, T>::value,
       "Template type T must be a subtype of __BarPlot<T>.");
-    xdata_.resize(ngroups);
-    std::fill_n(xdata_.begin(), ngroups, 1);
-  }
-
-  template<class Tx>
-  GroupedBars(T& baseplot, const std::vector<Tx>& xdata)
-      : baseplot_(baseplot)
-      , group_size_(1)
-      , ngroups_(xdata.size()) {
-    static_assert(std::is_base_of<__BarPlot<T>, T>::value,
-      "Template type T must be a subtype of __BarPlot<T>.");
-    xdata_.resize(xdata.size());
-    std::transform(xdata.begin(), xdata.end(), xdata_.begin(),
-                   [](const auto& s) { return std::to_string(s); });
+    // std::fill_n(xdata_.begin(), ngroups_, 1);
   }
 
   template<class Ty>
@@ -1815,9 +1802,9 @@ public:
       return *this;
     }
     
-    const int nbars = std::min<int>(ngroups_, ydata.size());
-    std::vector<double> ydata_double(nbars);
-    std::transform(ydata.begin(), ydata.begin() + nbars, ydata_double.begin(),
+    ngroups_ = std::max<int>(ngroups_, ydata.size());
+    std::vector<double> ydata_double(ngroups_);
+    std::transform(ydata.begin(), ydata.begin() + ngroups_, ydata_double.begin(),
                    [](const auto& y) -> double { return y; });
 
     auto minmax = std::minmax_element(ydata_double.begin(), ydata_double.end());
@@ -1829,7 +1816,7 @@ public:
     metadata_.push_back(
       BarPlotMetadata{}.SetLabel(label)
                        .SetBrush(brush)
-                       .SetLength(nbars)
+                       .SetLength(ngroups_)
                        .SetBarYdata(std::move(ydata_double))
                        .SetInteger(std::is_integral<Ty>::value)
     );
@@ -1841,10 +1828,9 @@ public:
     return *this;
   }
 
-  T& Plot(double height_resize = 0.8) {
-    int current_col = 0;
-    int width = baseplot_.GetWidth() / (ngroups_ * group_size_);
-
+  T& Commit(double height_resize = 0.8) {
+    const int n_bars = ngroups_ * group_size_ + (ngroups_ - 1);
+    const int width = baseplot_.GetWidth() / n_bars;
     const double ylim_top = baseplot_.GetYlimTop();
     const double ylim_bottom = baseplot_.GetYlimBottom();
     const double ystep = (ylim_top - ylim_bottom) / baseplot_.GetHeight();
@@ -1852,8 +1838,9 @@ public:
     auto to_height = [=](double y) -> int { return (y - ylim_bottom) / ystep; };
 
     std::vector<Bar> bars;
+    int current_col = 0;
     for (int i = 0; i < ngroups_; ++i) {
-      for (int j = 0; j < group_size_ - 1; ++j) {
+      for (int j = 0; j < group_size_; ++j) {
         std::string name;
         if (metadata_[j].is_integer) {
           name = std::to_string(static_cast<long int>(metadata_[j].ydata[i]));
@@ -1869,8 +1856,10 @@ public:
         );
         current_col += width;
       }
-      bars.push_back(Bar{}.SetEmpty(true));
-      current_col += width;
+      if (i != ngroups_ - 1) {
+        bars.push_back(Bar{}.SetEmpty(true));
+        current_col += width;
+      }
     }
     return baseplot_.PlotBars(std::move(bars));
   }
@@ -1878,7 +1867,7 @@ public:
 private:
   T& baseplot_;
   int group_size_;
-  const int ngroups_;
+  int ngroups_;
   std::vector<std::string> xdata_;
   std::vector<BarPlotMetadata> metadata_;
 };

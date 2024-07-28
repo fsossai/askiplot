@@ -8,12 +8,12 @@ using namespace askiplot;
 
 int main() {
   BarPlot bp;
-  auto gb = GroupedBars<BarPlot>(bp, 2);
+  auto gb = GroupedBars<BarPlot>(bp);
   gb
-    (vector<int>{80,40}, "Data Source 1", Brush('@'))
-    (vector<int>{20,50}, "Data Source 2", Brush('$'))
-    (vector<int>{10,20}, "Data Source 3", Brush('.'))
-    .Plot();
+    .Add(vector<int>{80,40}, "Data Source 1", Brush('@'))
+    .Add(vector<int>{20,50}, "Data Source 2", Brush('$'))
+    .Add(vector<int>{10,20}, "Data Source 3", Brush('.'))
+    .Commit();
   bp
     .DrawBarLabels(Offset(0,1))
     .DrawLegend()

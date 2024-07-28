@@ -3,14 +3,12 @@
 - [ ] GroupedBars
     - [ ] Renamed to BarGrouper?
     - [ ] .Plot --> .Commit
-    - [ ] operator() --> add()
+    - [x] operator() --> Add()
     - [ ] No number of groups in ctor
     - [ ] Simplify the use of `GroupedBars`
     - [ ] Add default `Brush` for `GroupedBars`
 - [ ] Random brush
 - [ ] Named bars
-- [ ] Replace `Fusion` with `Fuse` and `FuseCentered` member functions
-- [ ] PlotFusion is pointless. A regular Plot method is enough
 - [ ] Drawing horizontal and vertical lines given a relative position
 - [ ] Simplify all overloads that handle default values
 - [ ] Subplots / Views

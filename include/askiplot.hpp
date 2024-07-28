@@ -42,7 +42,7 @@ static constexpr struct {
   0, 2, 0
 };
 
-//************************** Defauts and constants **************************//
+//************************** Defaults and constants *************************//
 
 std::string DefaultBrushMain = "_";
 std::string DefaultBrushArea = "#";
@@ -469,11 +469,11 @@ template<class Subtype>
 class __FixedGamma : public __Gamma<Subtype> {
 public:
   __FixedGamma(const std::string& gamma) {
-    SetGamma(gamma);
+    Set(gamma);
   }
 
   __FixedGamma() {
-    SetGamma("  ..oo00#@");
+    Set("  ..oo00#@");
   }
 
   Brush operator()(uint8_t level) override {
@@ -484,12 +484,12 @@ public:
     std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(gamma_.begin(), gamma_.end(), g);
-    return SetGamma(gamma_);
+    return Set(gamma_);
   }
 
-  std::string GetGamma() const { return gamma_; }
+  std::string ToString() const { return gamma_; }
 
-  Subtype& SetGamma(const std::string& gamma) {
+  Subtype& Set(const std::string& gamma) {
     std::size_t new_size = std::min<std::size_t>(gamma.size(), 256L);
     gamma_.resize(new_size);
     std::copy_n(gamma.begin(), new_size, gamma_.begin());
@@ -555,7 +555,7 @@ template<class Subtype>
 class __RandomGamma : public __VariableGamma<Subtype> {
 public:
   __RandomGamma(const std::string& gamma) {
-    SetGamma(gamma);
+    Set(gamma);
   }
 
   Brush operator()(uint8_t level) override {
@@ -565,9 +565,9 @@ public:
     return gamma_[rand() % gamma_.size()];
   }
 
-  std::string GetGamma() const { return gamma_; }
+  std::string ToString() const { return gamma_; }
   
-  Subtype& SetGamma(const std::string& gamma) {
+  Subtype& Set(const std::string& gamma) {
     std::size_t new_size = std::min<std::size_t>(gamma.size(), 256L);
     gamma_.resize(new_size);
     std::copy_n(gamma.begin(), new_size, gamma_.begin());
@@ -1806,9 +1806,9 @@ public:
   }
 
   template<class Ty>
-  GroupedBars& operator()(const std::vector<Ty>& ydata,
-                          const std::string& label,
-                          const Brush& brush) {
+  GroupedBars& Add(const std::vector<Ty>& ydata,
+                   const std::string& label,
+                   const Brush& brush) {
     if ((group_size_ + 1) * ngroups_ - 1 <= baseplot_.GetWidth()) {
       ++group_size_;
     } else {

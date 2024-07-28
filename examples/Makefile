@@ -1,6 +1,6 @@
 CXX=g++
 
-all: fusion	gaussian grid groupedbars	textlines turing turing_animated logo lines
+all: fusion	gaussian grid bar_grouper textlines turing turing_animated logo lines
 
 %: %.cpp
 	$(CXX) -std=c++17 -Wall -Wpedantic -Wextra -O3 -I../include $< -o $@.out

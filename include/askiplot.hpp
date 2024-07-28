@@ -25,6 +25,7 @@
 #include <numeric>
 #include <random>
 #include <set>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <sys/ioctl.h>
@@ -120,6 +121,25 @@ enum BlankFusion : bool {
 //******************** Namespace-private free functions *********************//
 
 namespace {
+
+template<class Ty>
+std::string FormatValue(Ty value) {
+  return std::to_string(value);
+}
+
+template<>
+std::string FormatValue<double>(double value) {
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(1) << value;
+  std::string formatted = oss.str();
+  formatted.erase(formatted.find_last_not_of('0') + 1, std::string::npos);
+
+  if (formatted.back() == '.') {
+    formatted.pop_back();
+  }
+
+  return formatted;
+}
 
 } // private namespace
 
@@ -1740,7 +1760,7 @@ public:
     bars.reserve(n);
     for (std::size_t i = 0; i < n; ++i) {
       bars.push_back(
-        Bar{}.SetName(std::to_string(ydata[i]))
+        Bar{}.SetName(FormatValue(ydata[i]))
              .SetHeight((ydata[i] - ylim_bottom) / ystep)
              .SetColumn((xdata[i] - xlim_left  ) / xstep - bar_width / 2.0)
              .SetWidth(bar_width)
@@ -1856,9 +1876,9 @@ public:
       for (int j = 0; j < group_size_; ++j) {
         std::string name;
         if (metadata_[j].is_integer) {
-          name = std::to_string(static_cast<long int>(metadata_[j].ydata[i]));
+          name = FormatValue(static_cast<long int>(metadata_[j].ydata[i]));
         } else {
-          name = std::to_string(metadata_[j].ydata[i]);
+          name = FormatValue(metadata_[j].ydata[i]);
         }
         bars.push_back(
           Bar{}.SetName(name)
@@ -1933,7 +1953,7 @@ public:
     bars.resize(nbins_);
     for (int i = 0; i < nbins_; ++i) {
       bars.push_back(
-        Bar{}.SetName(std::to_string(bar_heights_[i]))
+        Bar{}.SetName(FormatValue(bar_heights_[i]))
              .SetHeight(bar_heights_[i])
              .SetBrush(brush)
              .SetColumn(i * bin_width)

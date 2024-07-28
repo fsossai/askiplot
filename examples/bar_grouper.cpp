@@ -7,7 +7,7 @@ using namespace std;
 using namespace askiplot;
 
 int main() {
-  BarPlot bp(80, 25);
+  BarPlot bp;
   BarGrouper(bp, askiplot::kSymbolBrushes)
     .Add(vector<int>{80,40}, "Data Source 1")
     .Add(vector<int>{20,50}, "Data Source 2", Brush('x'))

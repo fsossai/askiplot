@@ -1,4 +1,5 @@
 #include <iostream>
+
 #include <askiplot.hpp>
 
 using namespace std;
@@ -9,13 +10,13 @@ int main() {
   auto box2 = Plot(box1).DrawTextCentered("BOX2", Center);
 
   Plot p(60,15);
-  p.Fusion()(box1, NorthWest)
-            (box1, SouthEast)
-            (box2, NorthEast)
-            (box2, SouthWest)
-            .Fuse()
-   .DrawLineHorizontalAtRow(0.5)
-   .DrawLineVerticalAtCol(0.5)
+  p
+    .Fuse(box1, NorthWest)
+    .Fuse(box1, SouthEast)
+    .Fuse(box2, NorthEast)
+    .Fuse(box2, SouthWest)
+    .DrawLineHorizontalAtRow(0.5)
+    .DrawLineVerticalAtCol(0.5)
   ;
   cout << p.Serialize();
   return 0;

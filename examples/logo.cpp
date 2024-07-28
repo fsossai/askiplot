@@ -1,7 +1,8 @@
-#include <iostream>
-#include <askiplot.hpp>
 #include <chrono>
+#include <iostream>
 #include <thread>
+
+#include <askiplot.hpp>
 
 using namespace std;
 using namespace std::chrono_literals;

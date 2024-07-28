@@ -1,6 +1,7 @@
-#include <iostream>
 #include <chrono>
+#include <iostream>
 #include <thread>
+
 #include <askiplot.hpp>
 
 using namespace std;
@@ -19,7 +20,7 @@ int main() {
       p.DrawLineHorizontalAtRow((float)rand() / (float)RAND_MAX);
     }
 
-    p.Fusion()(box, Center - Offset(box.GetWidth()/2, box.GetHeight()/2)).Fuse();
+    p.Fuse(box, Center - Offset(box.GetWidth()/2, box.GetHeight()/2));
 
     cout << p.Serialize();
     this_thread::sleep_for(100ms); 

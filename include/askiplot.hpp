@@ -989,7 +989,7 @@ public:
       }
     }
 
-    return Fusion()(subplot, position).Fuse();
+    return Fuse(subplot, position);
   }
 
   template<class T = FixedGamma>
@@ -1276,8 +1276,40 @@ public:
     return Fill(palette_.GetBrush("Main"));
   }
 
-  PlotFusion<Subtype> Fusion() {
-    return PlotFusion<Subtype>(static_cast<Subtype&>(*this));
+  template<class U>
+  Subtype& Fuse(const U& other,
+                const Position& position = SouthWest,
+                BlankFusion keep_blanks = KeepBlanks,
+                AdjustPosition adjust = Adjust) {
+    auto pos_abs = GetAbsolutePosition(position);
+    if (adjust) {
+      AdjustAbsolutePosition(pos_abs, other.GetWidth(), other.GetHeight(), true);
+    }
+    
+    const auto offset = pos_abs.offset;
+    const int off_c = offset.GetCol();
+    const int off_r = offset.GetRow();
+    const int col_beg = std::max(0, -off_c);
+    const int col_end = std::min(other.GetWidth(), GetWidth() - off_c);
+    const int row_beg = std::max(0, -off_r);
+    const int row_end = std::min(other.GetHeight(), GetHeight() - off_r);
+
+    if (keep_blanks) {
+      for (int i = col_beg; i < col_end; ++i) {
+        for (int j = row_beg; j < row_end; ++j) {
+          At(i + off_c, j + off_r) = other.At(i, j);
+        }
+      }
+    } else {
+      for (int i = col_beg; i < col_end; ++i) {
+        for (int j = row_beg; j < row_end; ++j) {
+          if (!(other.At(i, j).GetName() == "Blank")) {
+            At(i + off_c, j + off_r) = other.At(i, j);
+          }
+        }
+      }
+    }
+    return static_cast<Subtype&>(*this);
   }
 
   bool IsLike(const IPlot& other) const {
@@ -1287,7 +1319,7 @@ public:
   Subtype& Move(const Offset& offset) {
     auto copy = *this;
     Clear();
-    Fusion()(copy, offset, DontAdjust).Fuse();
+    Fuse(copy, offset, DontAdjust);
     return static_cast<Subtype&>(*this);
   }
 
@@ -1541,66 +1573,6 @@ protected:
 };
 
 class Plot final : public __Plot<Plot> { using __Plot::__Plot; };
-
-//******************************* PlotFusion ********************************//
-
-template<class T>
-class PlotFusion {
-public:
-  PlotFusion(T& baseplot)
-      : baseplot_(baseplot) {
-    static_assert(std::is_base_of<__Plot<T>, T>::value, "Template type T must be a subtype of __Plot<T>.");
-  }
-
-  template<class U>
-  PlotFusion& operator()(const U& other,
-                         const Position& position = SouthWest,
-                         AdjustPosition adjust = Adjust) {
-    auto pos_abs = baseplot_.GetAbsolutePosition(position);
-    if (adjust) {
-      baseplot_.AdjustAbsolutePosition(pos_abs, other.GetWidth(), other.GetHeight(), true);
-    }
-    plots_offsets_.push_back({&other, pos_abs.offset});
-    return *this;
-  }
-
-  T& Fuse(BlankFusion keep_blanks = KeepBlanks) {
-    const int base_width = baseplot_.GetWidth();
-    const int base_height = baseplot_.GetHeight();
-    for (const auto& po : plots_offsets_) {
-      const auto plot = std::get<const IPlot*>(po);
-      const auto offset = std::get<Offset>(po);
-
-      const int off_c = offset.GetCol();
-      const int off_r = offset.GetRow();
-      const int col_beg = std::max(0, -off_c);
-      const int col_end = std::min(plot->GetWidth(), base_width - off_c);
-      const int row_beg = std::max(0, -off_r);
-      const int row_end = std::min(plot->GetHeight(), base_height - off_r);
-
-      if (keep_blanks) {
-        for (int i = col_beg; i < col_end; ++i) {
-          for (int j = row_beg; j < row_end; ++j) {
-            baseplot_.At(i + off_c, j + off_r) = plot->At(i, j);
-          }
-        }
-      } else {
-        for (int i = col_beg; i < col_end; ++i) {
-          for (int j = row_beg; j < row_end; ++j) {
-            if (!(plot->At(i, j).GetName() == "Blank")) {
-              baseplot_.At(i + off_c, j + off_r) = plot->At(i, j);
-            }
-          }
-        }
-      }
-    }
-    return baseplot_;
-  }
-
-private:
-  T& baseplot_;
-  std::vector<std::pair<const IPlot*, Offset>> plots_offsets_;
-};
 
 //*********************************** Bar ***********************************//
 

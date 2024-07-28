@@ -1,8 +1,9 @@
-#include <iostream>
-#include <thread>
 #include <chrono>
+#include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
+
 #include <askiplot.hpp>
 
 using namespace std;

@@ -64,6 +64,7 @@ std::string DefaultBrushBorderLeft = "|";
 std::string DefaultBrushBorderRight = "|";
 std::string DefaultBrushLineHorizontal = "-";
 std::string DefaultBrushLineVertical = "|";
+int BarValuePrecision = 0;
 const std::vector<Brush> kLetterBrushes = StringToBrushes("abcdefghijklmnopqrstuvwxyz");
 const std::vector<Brush> kNumberBrushes = StringToBrushes("0123456789");
 const std::vector<Brush> kSymbolBrushes = StringToBrushes("@$*#.+&*=?,-%!^\"<~>'");
@@ -130,7 +131,7 @@ std::string FormatValue(Ty value) {
 template<>
 std::string FormatValue<double>(double value) {
   std::ostringstream oss;
-  oss << std::fixed << std::setprecision(1) << value;
+  oss << std::fixed << std::setprecision(BarValuePrecision) << value;
   std::string formatted = oss.str();
   formatted.erase(formatted.find_last_not_of('0') + 1, std::string::npos);
 

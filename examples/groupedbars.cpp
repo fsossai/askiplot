@@ -8,7 +8,7 @@ using namespace askiplot;
 
 int main() {
   BarPlot bp;
-  auto gb = GroupedBars<BarPlot>(bp);
+  auto gb = GroupedBars(bp);
   gb
     .Add(vector<int>{80,40}, "Data Source 1", Brush('@'))
     .Add(vector<int>{20,50}, "Data Source 2", Brush('$'))

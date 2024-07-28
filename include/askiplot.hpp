@@ -1620,12 +1620,10 @@ private:
 //********************************* BarPlot *********************************//
 
 // Forward declaration
-template<class T>
 class GroupedBars;
 
 template<class Subtype>
 class __BarPlot : public __Plot<Subtype> {
-template<class T>
 friend class GroupedBars;
 public:
   __BarPlot(int width = kConsoleWidth, int height = kConsoleHeight)
@@ -1793,17 +1791,14 @@ class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
 
 //******************************* GroupedBars *******************************//
 
-template<class T>
 class GroupedBars {
 public:
-  GroupedBars(T& baseplot, std::vector<Brush> brushes = kSymbolBrushes)
+  GroupedBars(BarPlot& baseplot, std::vector<Brush> brushes = kSymbolBrushes)
       : baseplot_(baseplot)
       , group_size_(0)
       , ngroups_(0)
       , brushes_(brushes)
       , brush_index_(0) {
-    static_assert(std::is_base_of<__BarPlot<T>, T>::value,
-      "Template type T must be a subtype of __BarPlot<T>.");
   }
 
   template<class Ty>
@@ -1848,7 +1843,7 @@ public:
     return Add(ydata, label, brushes_[brush_index_++ % brushes_.size()]); 
   }
 
-  T& Commit(double height_resize = 0.8) {
+  BarPlot& Commit(double height_resize = 0.8) {
     const int n_bars = ngroups_ * group_size_ + (ngroups_ - 1);
     const int width = baseplot_.GetWidth() / n_bars;
     const double ylim_top = baseplot_.GetYlimTop();
@@ -1885,7 +1880,7 @@ public:
   }
 
 private:
-  T& baseplot_;
+  BarPlot& baseplot_;
   int group_size_;
   int ngroups_;
   std::vector<std::string> xdata_;

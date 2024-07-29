@@ -182,12 +182,6 @@ o...o..oooo..oo.ooooooooooooo.. o0.        0##......oo............ ........   ..
 
 ```
 
-```C++
-```
-```
-```
-
-
 ### Text and lines
 [textlines.cpp](examples/textlines.cpp) demonstrates how to draw horizontal or vertical text and lines.
 At every cardinal point, text is adjusted so to fit the console's boundaries.

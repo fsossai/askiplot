@@ -1841,6 +1841,7 @@ public:
     }
     
     ngroups_ = std::max<int>(ngroups_, ydata.size());
+
     std::vector<double> ydata_double(ngroups_);
     std::transform(ydata.begin(), ydata.begin() + ngroups_, ydata_double.begin(),
                    [](const auto& y) -> double { return y; });
@@ -1894,7 +1895,7 @@ public:
         } else {
           name = FormatValue(metadata_[j].ydata[i]);
         }
-        auto height = to_height(metadata_[j].ydata[i]) * height_resize + (int)!!show_group_names_;
+        auto height = to_height(metadata_[j].ydata[i]) * height_resize;
         if (show_group_names_) {
           height += 1;
         }

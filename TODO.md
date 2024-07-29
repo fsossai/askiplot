@@ -5,3 +5,4 @@
 - [ ] Subplots / Views
 - [ ] Simplify all overloads that handle default values
 - [ ] Draw line at an angle
+- [ ] DrawTextInLine

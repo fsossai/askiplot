@@ -1,15 +1,44 @@
 # AskiPlot
 
-AskiPlot is a single-header library written in C++17 for creating plots with ASCII characters only.
-The library encourage chaining programming as all API classes have a [fluent interface](https://en.wikipedia.org/wiki/Fluent_interface).
-Static polymorhism is achieved through the use of the [CRTP](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern)
-(Curiously Recurring Template Pattern).
+```C++
+cout <<
+  Plot(80,20)
+    .DrawImage(Image("examples/logo.bmp").Invert(), TextGamma("askiplot"))
+    .Serialize();
+```
 
+```
+              a                                   s                             
+           kiplo                        ta    skiplotas                         
+          kiplot           aski        plot  as      kip  lota                  
+         sk iplo           tas         kipl ot  ask   ip  lota             skip 
+        lo  tas            kip          lotas  kipl   ot  ask              ipl  
+       ot   ask           iplo            tas  kipl   ot  ask              ipl  
+       ot  aski    plot   aski   pl    otaski  plo   tas kipl     otask   iplot 
+  askiplo  task   iplot   ask   ip    lota sk  ipl   ota skip    lot as   kipl  
+ ota ski plota    skipl   ota sk      iplo    task  ipl  ota    ski  plo  tas   
+kip  lo    tas    kiplo   taskiplo    tas     kipl ota   ski   plot  askiplot   
+ as kip    lot   a skip  lotaskipl    ota     skiplo     tas   kip   lot aski   
+    pl    otas   k iplo  task  iplo   tas     kip       lota  skip   lo  task   
+   ipl    ota   s   kip  lot   aski  plot    aski       plo   task   ip  lota   
+   ski    plo  tas  kip lota   ski   plo     task       ipl   otas   ki  plo    
+   ta     ski  p   lotaskipl   ota  skipl    ota        ski  plota  sk   ipl    
+  ota    skip  lotaskip lota   skiplotaski   plo        taskiplotaski    plot   
+  ask    iplo   taski   plo     task  ipl    ota        skipl  otask     iplo   
+  tas                                                                           
+  kip                                                                           
+```
+
+AskiPlot is a single-header library written in C++17 for creating plots with ASCII characters only.
 With AskiPlot you can plot grouped bars, histograms, boxes, lines and arrange text by specifying positions
 relative to the current console.
 Unless otherwise specified, the library will infere a canvas size that fits the console at run-time.
 
-## Usage examples
+The library is designed for method chainining. All classes have a [fluent interface](https://en.wikipedia.org/wiki/Fluent_interface).
+Static polymorhism is achieved through the use of the [CRTP](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern)
+(Curiously Recurring Template Pattern).
+
+## Examples
 
 Run `make` in the [examples](examples) directory to compile all the examples.
 
@@ -151,6 +180,11 @@ ooo.....oo......ooooooooooooo..o00o      .00##@0o................... .......   .
 ..ooo...oo....o.ooooooooooooo...00o       o0#@0oo.................. .......    ...
 o...o..oooo..oo.ooooooooooooo.. o0.        0##......oo............ ........   ...
 
+```
+
+```C++
+```
+```
 ```
 
 

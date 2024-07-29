@@ -1894,9 +1894,13 @@ public:
         } else {
           name = FormatValue(metadata_[j].ydata[i]);
         }
+        auto height = to_height(metadata_[j].ydata[i]) * height_resize + (int)!!show_group_names_;
+        if (show_group_names_) {
+          height += 1;
+        }
         auto bar = 
           Bar{}.SetName(name)
-               .SetHeight(to_height(metadata_[j].ydata[i]) * height_resize + (int)!!show_group_names_)
+               .SetHeight(height)
                .SetBrush(metadata_[j].brush)
                .SetColumn(current_col)
                .SetWidth(width);

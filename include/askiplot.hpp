@@ -1819,13 +1819,15 @@ class BarPlot final : public __BarPlot<BarPlot> { using __BarPlot::__BarPlot; };
 
 class BarGrouper {
 public:
+  using bar_group_t = std::vector<Bar>;
+
   BarGrouper(BarPlot& baseplot, std::vector<Brush> brushes = kSymbolBrushes)
       : baseplot_(baseplot)
       , group_size_(0)
       , ngroups_(0)
       , brushes_(brushes)
       , brush_index_(0)
-      , group_names_(true) {
+      , show_group_names_(true) {
   }
 
   template<class Ty>
@@ -1879,9 +1881,12 @@ public:
 
     auto to_height = [=](double y) -> int { return (y - ylim_bottom) / ystep; };
 
-    std::vector<Bar> bars;
+    std::vector<Bar> all_bars;
+    std::vector<bar_group_t> groups;
+
     int current_col = 0;
     for (int i = 0; i < ngroups_; ++i) {
+      bar_group_t group;
       for (int j = 0; j < group_size_; ++j) {
         std::string name;
         if (metadata_[j].is_integer) {
@@ -1889,41 +1894,80 @@ public:
         } else {
           name = FormatValue(metadata_[j].ydata[i]);
         }
-        bars.push_back(
+        auto bar = 
           Bar{}.SetName(name)
-               .SetHeight(to_height(metadata_[j].ydata[i]) * height_resize)
+               .SetHeight(to_height(metadata_[j].ydata[i]) * height_resize + (int)!!show_group_names_)
                .SetBrush(metadata_[j].brush)
                .SetColumn(current_col)
-               .SetWidth(width)
-        );
+               .SetWidth(width);
+        group.push_back(bar);
+        all_bars.push_back(bar);
         current_col += width;
       }
       if (i != ngroups_ - 1) {
-        bars.push_back(Bar{}.SetEmpty(true));
+        all_bars.push_back(Bar{}.SetEmpty(true));
         current_col += width;
       }
+      groups.push_back(std::move(group));
     }
 
-    if (group_names_) {
+    baseplot_.PlotBars(std::move(all_bars));
+
+    if (show_group_names_) {
+      DrawGroupNames(groups);
     }
 
-    return baseplot_.PlotBars(std::move(bars));
+    return baseplot_;
   }
 
-  BarGrouper& GroupNames(bool on) {
-    group_names_ = on;
+  BarGrouper& ShowGroupNames(bool show = true) {
+    show_group_names_ = show;
+    return *this;
+  }
+
+  BarGrouper& SetGroupNames(std::vector<std::string> names) {
+    group_names_ = std::move(names);
     return *this;
   }
 
 private:
+  BarGrouper& DrawGroupNames(const std::vector<bar_group_t>& groups) {
+    for (size_t i = 0; i < groups.size(); i++) {
+      const auto& group = groups[i];
+      const int group_column_begin = group[0].GetColumn();
+
+      int group_width = 0;
+      for (size_t j = 0; j < group.size(); j++) {
+        group_width += group[j].GetWidth();
+      }
+
+      std::string group_name = "";
+      if (i < group_names_.size()) {
+        group_name = " " + group_names_[i] + " ";
+      }
+
+      auto name_box =
+        Plot(group_width, 1)
+        .DrawBorders(Bottom)
+        .SetBrush(Brush("BorderLeft", '<'))
+        .SetBrush(Brush("BorderRight", '>'))
+        .DrawBorders(Left + Right)
+        .DrawTextCentered(group_name, South);
+      baseplot_.Fuse(name_box, {group_column_begin, 0});
+    }
+    return *this;
+  }
+
   BarPlot& baseplot_;
   int group_size_;
   int ngroups_;
   std::vector<std::string> xdata_;
   std::vector<BarPlotMetadata> metadata_;
   std::vector<Brush> brushes_;
+  std::vector<std::string> group_names_;
   int brush_index_;
-  bool group_names_;
+  bool show_group_names_;
+  
 };
 
 //******************************** HistPlot *********************************//

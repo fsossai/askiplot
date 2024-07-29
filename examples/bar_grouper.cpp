@@ -12,14 +12,14 @@ int main() {
     .Add(vector<int>{80, 40}, "Data Source 1")
     .Add(vector<int>{20, 50}, "Data Source 2", Brush('x'))
     .Add(vector<int>{10, 20}, "Data Source 3")
-    .GroupNames(true)
+    .SetGroupNames({"Group 1", "Group 2"})
+    .ShowGroupNames(true)
     .Commit();
   bp
     .DrawBarLabels(Offset(0, 1))
     .DrawLegend()
     .SetBrush("BorderTop", "/")
     .DrawBorders(Top + Right)
-    .Shift({0, 1})
   ;
   cout << bp.Serialize();
   

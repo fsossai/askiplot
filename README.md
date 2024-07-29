@@ -19,12 +19,14 @@ Run `make` in the [examples](examples) directory to compile all the examples.
 ```C++
 BarPlot bp;
 BarGrouper(bp, askiplot::kSymbolBrushes)
-  .Add(vector<int>{80,40}, "Data Source 1")
-  .Add(vector<int>{20,50}, "Data Source 2", Brush('x'))
-  .Add(vector<int>{10,20}, "Data Source 3")
+  .Add(vector<int>{80, 40}, "Data Source 1")
+  .Add(vector<int>{20, 50}, "Data Source 2", Brush('x'))
+  .Add(vector<int>{10, 20}, "Data Source 3")
+  .SetGroupNames({"Group 1", "Group 2"})
+  .ShowGroupNames(true)
   .Commit();
 bp
-  .DrawBarLabels(Offset(0,1))
+  .DrawBarLabels(Offset(0, 1))
   .DrawLegend()
   .SetBrush("BorderTop", "/")
   .DrawBorders(Top + Right)
@@ -35,11 +37,10 @@ Produces the following:
 ```
 ////////////////////////////////////////////////////////////////////////////////
                                                             ___________________|
-                                                            | @ Data Source 1 ||
-    80                                                      | x Data Source 2 ||
- _________                                                  | $ Data Source 3 ||
+    80                                                      | @ Data Source 1 ||
+ _________                                                  | x Data Source 2 ||
+|@@@@@@@@@|                                                 | $ Data Source 3 ||
 |@@@@@@@@@|                                                 |_________________||
-|@@@@@@@@@|                                                                    |
 |@@@@@@@@@|                                                                    |
 |@@@@@@@@@|                                                                    |
 |@@@@@@@@@|                                                                    |
@@ -58,6 +59,7 @@ Produces the following:
 |@@@@@@@@@||xxxxxxxxx| _________            |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|  |
 |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|           |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|  |
 |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|           |@@@@@@@@@||xxxxxxxxx||$$$$$$$$$|  |
+<___________ Group 1 ___________>           <___________ Group 2 ___________>  |
 ```
 
 ### Histograms

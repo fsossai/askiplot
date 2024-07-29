@@ -1566,6 +1566,13 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
+  Subtype& Shift(const Offset& offset) {
+    auto shifted_plot = BlankLike(static_cast<Subtype&>(*this));
+    shifted_plot.Fuse(*this, offset, KeepBlanks, DontAdjust);
+    *this = shifted_plot;
+    return static_cast<Subtype&>(*this);
+  }
+
 protected:
   Position CalcBoxPosition(const Position& position, int box_width, int box_height) {
     switch (position.relative) {
@@ -1817,7 +1824,8 @@ public:
       , group_size_(0)
       , ngroups_(0)
       , brushes_(brushes)
-      , brush_index_(0) {
+      , brush_index_(0)
+      , group_names_(true) {
   }
 
   template<class Ty>
@@ -1895,7 +1903,16 @@ public:
         current_col += width;
       }
     }
+
+    if (group_names_) {
+    }
+
     return baseplot_.PlotBars(std::move(bars));
+  }
+
+  BarGrouper& GroupNames(bool on) {
+    group_names_ = on;
+    return *this;
   }
 
 private:
@@ -1906,6 +1923,7 @@ private:
   std::vector<BarPlotMetadata> metadata_;
   std::vector<Brush> brushes_;
   int brush_index_;
+  bool group_names_;
 };
 
 //******************************** HistPlot *********************************//

@@ -246,7 +246,7 @@ SouthWest    | |             Centered text at South                    SouthEast
 
 ### Fusion
 
-[fusion.cpp](examples/fusion.cpp) demostrates the usefulness of the `Fusion` function and its flexibility given by the chained `operator()`.
+[fusion.cpp](examples/fusion.cpp) demonstrates how to fuse (compose) any plot together.
 ```C++
 auto box1 = Plot(10,5).Fill(".").DrawTextCentered("BOX1", Center);
 auto box2 = Plot(box1).DrawTextCentered("BOX2", Center);
@@ -310,3 +310,7 @@ ______________________________
 |33333333||22222222||11111111|
 |33333333||22222222||11111111|
 ```
+
+## Build on AskiPlot
+
+- [askibench](https://github.com/fsossai/askibench): plotting benchmark results with grouped bars.

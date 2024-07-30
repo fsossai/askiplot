@@ -1028,36 +1028,24 @@ public:
                        [](const auto& a, const auto& b)
                        { return a.label.size() < b.label.size(); }
       )->label.size();
+
     const int box_width = text_width + 6;
     const int box_height = metadata_.size() + 2;
+    
+    __Plot<Subtype> box(box_width, box_height);
 
-    auto box_rel_pos = CalcBoxPosition(position, box_width, box_height);
-    auto box_abs_pos = GetAbsolutePosition(box_rel_pos);
-    const int pos_col = box_abs_pos.offset.GetCol();
-    const int pos_row = box_abs_pos.offset.GetRow();
-
-    // Setting up Brushes
-    auto brush_top = Brush("BorderTop", DefaultBrushBorderTop);
-    auto brush_bottom = Brush("BorderBottom", DefaultBrushBorderBottom);
-    auto brush_left = Brush("BorderLeft", DefaultBrushBorderLeft);
-    auto brush_right = Brush("BorderRight", DefaultBrushBorderRight);
-
-    // Drawing box borders
-    for (int i = pos_col; i < pos_col + box_width; ++i) {
-      At(i, pos_row) = brush_bottom;                 // Bottom
-      At(i, pos_row + box_height - 1) = brush_top;   // Top
-    }
-    for (int j = pos_row; j < pos_row + box_height - 1; ++j) {
-      At(pos_col, j) = brush_left;                    // Left
-      At(pos_col + box_width - 1, j) = brush_right;   // Right
-    }
+    box.DrawBorders(Bottom)
+       .DrawBorders(Left + Right)
+       .DrawBorders(Top);
 
     // Writing labels
     for (std::size_t i = 0; i < metadata_.size(); ++i) {
-      DrawText(metadata_[i].brush.GetValue() + " " + metadata_[i].label,
-               Position(pos_col + 2, pos_row + box_height - 2 - i)
+      box.DrawText(metadata_[i].brush.GetValue() + " " + metadata_[i].label,
+                   Position(2, box_height - 2 - i)
       );
     }
+    Fuse(box, position, BlankFusion::KeepBlanks, AdjustPosition::Adjust);
+
     return static_cast<Subtype&>(*this);
   }
 

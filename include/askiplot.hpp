@@ -29,6 +29,7 @@
 #include <sstream>
 #include <string>
 #include <sys/ioctl.h>
+#include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
@@ -123,23 +124,11 @@ enum BlankFusion : bool {
 
 namespace {
 
-template<class Ty>
+template<class Ty, std::enable_if_t<std::is_arithmetic_v<Ty>, bool> = true>
 std::string FormatValue(Ty value) {
-  return std::to_string(value);
-}
-
-template<>
-std::string FormatValue<double>(double value) {
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(BarValuePrecision) << value;
-  std::string formatted = oss.str();
-  formatted.erase(formatted.find_last_not_of('0') + 1, std::string::npos);
-
-  if (formatted.back() == '.') {
-    formatted.pop_back();
-  }
-
-  return formatted;
+  return oss.str();
 }
 
 } // private namespace

@@ -869,14 +869,13 @@ public:
     if (width < 0 || height < 0) {
       throw InvalidPlotSize();
     }
+    width_ = width;
+    height_ = height;
     if (width == 0 || height == 0) {
       struct winsize w;
       ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
       if (width == 0) width_ = w.ws_col;
       if (height == 0) height_ = w.ws_row - 1;
-    } else {
-      width_ = width;
-      height_ = height;
     }
     autolimit_ = Borders::All;
     xlim_margin_ = 0.01;

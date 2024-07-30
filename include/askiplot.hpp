@@ -18,14 +18,15 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fcntl.h>
 #include <fstream>
+#include <iomanip>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <numeric>
 #include <random>
 #include <set>
-#include <iomanip>
 #include <sstream>
 #include <string>
 #include <sys/ioctl.h>
@@ -98,7 +99,14 @@ public:
 class BMPFormatNotSupported : public std::exception {
 public:
   virtual const char* what() const noexcept override {
-    return "BMP format not supported";
+    return "BMP format not supported.";
+  }
+};
+
+class InvalidTerminalSize : public std::exception {
+public:
+  virtual const char* what() const noexcept override {
+    return "Cannot determine terminal width or height.";
   }
 };
 
@@ -873,9 +881,15 @@ public:
     height_ = height;
     if (width == 0 || height == 0) {
       struct winsize w;
-      ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-      if (width == 0) width_ = w.ws_col;
-      if (height == 0) height_ = w.ws_row - 1;
+      int fd = open("/dev/tty", O_RDONLY);
+      if (ioctl(fd, TIOCGWINSZ, &w) == 0) {
+        close(fd);
+        if (width == 0) width_ = w.ws_col;
+        if (height == 0) height_ = w.ws_row - 1;
+      } else {
+        close(fd);
+        throw InvalidTerminalSize();
+      }
     }
     autolimit_ = Borders::All;
     xlim_margin_ = 0.01;

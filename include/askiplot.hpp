@@ -1794,9 +1794,36 @@ public:
   Subtype& PlotBars(const std::vector<Ty>& ydata,
                     const std::string& label = "",
                     const Brush& brush = Brush("Area", DefaultBrushArea)) {
-    auto xdata = std::vector<Ty>(ydata.size());
-    std::iota(xdata.begin(), xdata.end(), 1);
-    return PlotBars(xdata, ydata, label, brush);
+    const auto minmax_y = std::minmax_element(ydata.begin(), ydata.end());
+    const auto min_y = *minmax_y.first;
+    const auto max_y = *minmax_y.second;
+    const int nbars = ydata.size();
+
+    this->SetXlimits(0, nbars + 1);
+    this->SetYlimits(std::min(static_cast<Ty>(0), min_y), max_y * 1.05);
+
+    const double ylim_top = this->GetYlimTop();
+    const double ylim_bottom = this->GetYlimBottom();
+    const double ystep = (ylim_top - ylim_bottom) / this->GetHeight();
+    const int bar_width = this->GetWidth() / nbars;
+    
+    std::vector<Bar> bars;
+    bars.reserve(nbars);
+    for (std::size_t i = 0; i < nbars; ++i) {
+      bars.push_back(
+        Bar{}.SetName(FormatValue(ydata[i]))
+             .SetHeight((ydata[i] - ylim_bottom) / ystep)
+             .SetColumn(i * bar_width)
+             .SetWidth(bar_width)
+             .SetBrush(brush)
+             .SetEmpty(false)
+      );
+    }
+    this->metadata_.push_back(
+      PlotMetadata{}.SetBrush(brush)
+                    .SetLabel(label)
+    );
+    return PlotBars(std::move(bars));
   }
 
 protected:

@@ -128,6 +128,10 @@ enum BlankFusion : bool {
   KeepBlanks = true, IgnoreBlanks = false
 };
 
+enum Scaling : char {
+  Scaled, NotScaled
+};
+
 //******************** Namespace-private free functions *********************//
 
 namespace {
@@ -471,13 +475,19 @@ public:
     return static_cast<Subtype&>(*this);
   }
 
-  Subtype& SetInteger(bool integer) {
-    is_integer = integer;
+  Subtype& SetInteger(bool is_integer) {
+    this->is_integer = is_integer;
+    return static_cast<Subtype&>(*this);
+  }
+
+  Subtype& SetScaling(Scaling scaling) {
+    this->scaling = scaling;
     return static_cast<Subtype&>(*this);
   }
 
   std::vector<double> ydata;
   bool is_integer;
+  Scaling scaling;
 };
 
 class BarPlotMetadata final : public __BarPlotMetadata<BarPlotMetadata> { };
@@ -1849,8 +1859,9 @@ public:
 
   template<class Ty>
   BarGrouper& Add(const std::vector<Ty>& ydata,
-                   const std::string& label,
-                   const Brush& brush) {
+                  Scaling scaling,
+                  const std::string& label,
+                  const Brush& brush) {
     if ((group_size_ + 1) * ngroups_ - 1 <= baseplot_.GetWidth()) {
       ++group_size_;
     } else {
@@ -1863,11 +1874,6 @@ public:
     std::transform(ydata.begin(), ydata.begin() + ngroups_, ydata_double.begin(),
                    [](const auto& y) -> double { return y; });
 
-    auto minmax = std::minmax_element(ydata_double.begin(), ydata_double.end());
-    const double current_min = *minmax.first;
-    const double current_max = *minmax.second;
-    baseplot_.SetYlimits(std::min(baseplot_.GetYlimBottom(), current_min),
-                         std::max(baseplot_.GetYlimTop(), current_max));
 
     metadata_.push_back(
       BarPlotMetadata{}.SetLabel(label)
@@ -1875,6 +1881,7 @@ public:
                        .SetLength(ngroups_)
                        .SetBarYdata(std::move(ydata_double))
                        .SetInteger(std::is_integral<Ty>::value)
+                       .SetScaling(scaling)
     );
 
     baseplot_.metadata_.push_back(
@@ -1886,21 +1893,40 @@ public:
 
   template<class Ty>
   BarGrouper& Add(const std::vector<Ty>& ydata,
-                   const std::string& label) {
-    return Add(ydata, label, brushes_[brush_index_++ % brushes_.size()]); 
+                  Scaling scaling,
+                  const std::string& label) {
+    return Add(ydata, scaling, label, brushes_[brush_index_++ % brushes_.size()]); 
   }
 
   BarPlot& Commit(double height_resize = 0.8) {
+    if (metadata_.size() == 0) {
+      return baseplot_;
+    }
     const int n_bars = ngroups_ * group_size_ + (ngroups_ - 1);
     const int width = baseplot_.GetWidth() / n_bars;
+
+    std::vector<Bar> all_bars;
+    std::vector<bar_group_t> groups;
+
+    std::vector<double> ymax;
+
+    double new_ylim_bottom = 0.;
+    double new_ylim_top = metadata_[0].ydata[0];
+    for (auto &meta : metadata_) {
+      auto minmax = std::minmax_element(meta.ydata.begin(), meta.ydata.end());
+      if (meta.scaling == Scaled) {
+        new_ylim_bottom = std::min(new_ylim_bottom, *minmax.first);
+        new_ylim_top = std::max(new_ylim_top, *minmax.second);
+      }
+      ymax.push_back(*minmax.second);
+    }
+    baseplot_.SetYlimits(new_ylim_bottom, new_ylim_top);
+
     const double ylim_top = baseplot_.GetYlimTop();
     const double ylim_bottom = baseplot_.GetYlimBottom();
     const double ystep = (ylim_top - ylim_bottom) / baseplot_.GetHeight();
 
-    auto to_height = [=](double y) -> int { return (y - ylim_bottom) / ystep; };
-
-    std::vector<Bar> all_bars;
-    std::vector<bar_group_t> groups;
+    auto to_height = [=](double y) -> double { return (y - ylim_bottom) / ystep; };
 
     int current_col = 0;
     for (int i = 0; i < ngroups_; ++i) {
@@ -1912,7 +1938,12 @@ public:
         } else {
           name = FormatValue(metadata_[j].ydata[i]);
         }
-        auto height = to_height(metadata_[j].ydata[i]) * height_resize;
+        int height;
+        if (metadata_[j].scaling == NotScaled) {
+          height = metadata_[j].ydata[i] / ymax[j] * baseplot_.GetHeight() * height_resize;
+        } else {
+          height = to_height(metadata_[j].ydata[i]) * height_resize;
+        }
         if (show_group_names_) {
           height += 1;
         }

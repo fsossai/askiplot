@@ -6,3 +6,4 @@
 - [ ] Draw line at an angle
 - [ ] DrawTextInLine
 - [ ] Fix histogram bug when data.size() <= 1
+- [ ] Smart positioning of legend with relative positions

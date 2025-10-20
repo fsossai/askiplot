@@ -1737,50 +1737,20 @@ public:
                     const std::vector<Ty>& ydata,
                     const std::string& label = "",
                     const Brush& brush = Brush("Area", DefaultBrushArea)) {
-    auto xdata_s = xdata;
-    std::sort(xdata_s.begin(), xdata_s.end(), std::less<Tx>());
-    std::vector<Tx> diffs(xdata_s.size());
-    std::adjacent_difference(xdata_s.begin(), xdata_s.end(), diffs.begin());
-    auto min_diff = *std::min_element(diffs.begin(), diffs.end());
-    
-    const auto minmax_x = std::minmax_element(xdata_s.begin(), xdata_s.end());
+    const auto minmax_x = std::minmax_element(xdata.begin(), xdata.end());
     const auto min_x = *minmax_x.first;
     const auto max_x = *minmax_x.second;
-    const auto minmax_y = std::minmax_element(ydata.begin(), ydata.end());
-    const auto min_y = *minmax_y.first;
-    const auto max_y = *minmax_y.second;
-
-    this->SetXlimits(min_x - min_diff, max_x + min_diff);
-    this->SetYlimits(std::min(static_cast<Ty>(0), min_y), max_y * 1.05);
-
-    const double xlim_left = this->GetXlimLeft();
-    const double xlim_right = this->GetXlimRight();
-    const double ylim_top = this->GetYlimTop();
-    const double ylim_bottom = this->GetYlimBottom();
-
-    const double xstep = (xlim_right - xlim_left) / this->GetWidth();
-    const double ystep = (ylim_top - ylim_bottom) / this->GetHeight();
+    const auto span_x = max_x - min_x;
+    const auto nbars = std::min<int>(xdata.size() + 1, this->GetWidth());
     
-    const int bar_width = min_diff / xstep;
-    const std::size_t n = std::min(xdata.size(), ydata.size());
-
-    std::vector<Bar> bars;
-    bars.reserve(n);
-    for (std::size_t i = 0; i < n; ++i) {
-      bars.push_back(
-        Bar{}.SetName(FormatValue(ydata[i]))
-             .SetHeight((ydata[i] - ylim_bottom) / ystep)
-             .SetColumn((xdata[i] - xlim_left  ) / xstep - bar_width / 2.0)
-             .SetWidth(bar_width)
-             .SetBrush(brush)
-             .SetEmpty(false)
-      );
+    std::vector<Ty> ydata_filled(nbars);
+    for (std::size_t i = 0; i < xdata.size(); i++) {
+      const double normalized_x = (double)(xdata[i] - min_x) / (double)span_x;
+      const int remapped_x = normalized_x * (nbars - 1);
+      ydata_filled[remapped_x] = ydata[i];
     }
-    this->metadata_.push_back(
-      PlotMetadata{}.SetBrush(brush)
-                    .SetLabel(label)
-    );
-    return PlotBars(std::move(bars));
+
+    return PlotBars(ydata_filled, label, brush);
   }
 
   template<class Tx, class Ty>
@@ -1807,7 +1777,7 @@ public:
     const auto minmax_y = std::minmax_element(ydata.begin(), ydata.end());
     const auto min_y = *minmax_y.first;
     const auto max_y = *minmax_y.second;
-    const int nbars = ydata.size();
+    const auto nbars = ydata.size();
 
     this->SetXlimits(0, nbars + 1);
     this->SetYlimits(std::min(static_cast<Ty>(0), min_y), max_y * 1.05);
@@ -1815,7 +1785,7 @@ public:
     const double ylim_top = this->GetYlimTop();
     const double ylim_bottom = this->GetYlimBottom();
     const double ystep = (ylim_top - ylim_bottom) / this->GetHeight();
-    const int bar_width = this->GetWidth() / nbars;
+    const auto bar_width = this->GetWidth() / nbars;
     
     std::vector<Bar> bars;
     bars.reserve(nbars);

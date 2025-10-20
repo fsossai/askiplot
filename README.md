@@ -38,9 +38,9 @@ The library is designed for method chainining. All classes have a [fluent interf
 Static polymorhism is achieved through the use of the [CRTP](https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern)
 (Curiously Recurring Template Pattern).
 
-## Examples
+## Compiling
 
-Run `make` in the [examples](examples) directory to compile all the examples.
+Run `make` from the [tools](tools) or [examples](examples) directory to compile.
 
 ### Grouped bars
 

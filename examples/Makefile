@@ -1,12 +1,9 @@
-CXX ?= g++
-OPT ?= -O3
+TARGETS = fusion.out gaussian.out grid.out bar_grouper.out textlines.out turing.out turing_animated.out logo.out lines.out
 
-all: fusion	gaussian grid bar_grouper textlines turing turing_animated logo lines
+all: $(TARGETS)
 
-%: %.cpp
-	$(CXX) -std=c++17 -Wall -Wpedantic -Wextra $(OPT) -I../include $< -o $@.out
+%.out: %.cpp
+	$(CXX) -std=c++17 -Wall -Wpedantic -Wextra -O3 -I ../include $< -o $@.out
 
 clean:
-	rm -rf *.out
-
-.PHONY: all clean
+	rm -f $(TARGETS)

@@ -311,6 +311,16 @@ ______________________________
 |33333333||22222222||11111111|
 ```
 
+## Brushes
+
+- **Main**: generic drawing pen (used by lines/points). Default: "_"
+- **Blank**: background/clears. Default: " "
+- **Area**: fills for bars/boxes/hist bins. Default: "#"
+- **LineHorizontal**: horizontal helper lines. Default: "-"
+- **LineVertical**: vertical helper lines. Default: "|"
+- **BorderTop**/**BorderBottom**: top/bottom frame. Default: "_"
+- **BorderLeft**/**BorderRight**: left/right frame. Default "|"
+
 ## Build on AskiPlot
 
 - [askibench](https://github.com/fsossai/askibench): plotting benchmark results with grouped bars.

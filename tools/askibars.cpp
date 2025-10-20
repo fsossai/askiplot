@@ -154,7 +154,13 @@ int main(int argc, char *argv[]) {
   }
 
   askiplot::BarPlot bp;
-  cout << bp.PlotBars(x, y, "data").Serialize() << "\n";
+  cout << bp.SetBrush("BorderTop", "\u2581")
+              .SetBrush("BorderLeft", "\u2595")
+              .SetBrush("BorderRight", "\u258F")
+              .SetBrush("Area", "\u2588")
+              .PlotBars(x, y)
+              .Serialize()
+       << "\n";
 
   return 0;
 }

@@ -331,25 +331,26 @@ public:
     name_ = name.size() == 0 ? "*" : name;
     return *this;
   }
-
+  
   Brush& SetValue(const std::string& value) {
-    if (value.size() == 0) {
+    if (value.empty() || value[0] == '\0') {
       throw InvalidBrushValue();
-    } else if (std::isprint(static_cast<uint8_t>(value[0]))) {
-      value_.resize(1);
-      value_[0] = value[0];
-    } else if (value.size() == 1) {
-      if (value[0] == '\t' || value[0] == '\n' || value[0] == '\r') {
-        value_[0] = ' ';
-      } else {
-        throw InvalidBrushValue();
-      }
-    } else {
-      value_.resize(2);
-      value_[0] = value[0];
-      value_[1] = value[1];
     }
-    return *this;  
+    unsigned char c = static_cast<unsigned char>(value[0]);
+    size_t char_len = 1;
+    if (c <= 0x7F) { // 1 byte (ASCII)
+      char_len = 1;
+    } else if (0xC2 <= c && c <= 0xDF) { // 2 bytes (UTF-8)
+      char_len = 2;
+    } else if (0xE0 <= c && c <= 0xEF) { // 3 bytes (UTF-8)
+      char_len = 3;
+    } else if (0xF0 <= c && c <= 0xF4) { // 4 bytes (UTF-8)
+      char_len = 4;
+    } else {
+      throw InvalidBrushValue();
+    }
+    value_ = value.substr(0, char_len);
+    return *this;
   }
 
 private:
@@ -1732,11 +1733,13 @@ public:
     return DrawBars(bars);
   }
 
+
+
   template<class Tx, class Ty>
   Subtype& PlotBars(const std::vector<Tx>& xdata,
                     const std::vector<Ty>& ydata,
-                    const std::string& label = "",
-                    const Brush& brush = Brush("Area", DefaultBrushArea)) {
+                    const std::string& label,
+                    const Brush& brush) {
     const auto minmax_x = std::minmax_element(xdata.begin(), xdata.end());
     const auto min_x = *minmax_x.first;
     const auto max_x = *minmax_x.second;
@@ -1754,9 +1757,16 @@ public:
   }
 
   template<class Tx, class Ty>
+  Subtype& PlotBars(const std::vector<Tx>& xdata,
+                    const std::vector<Ty>& ydata,
+                    const std::string& label = "") {
+    return PlotBars(xdata, ydata, label, this->palette_.GetBrush("Area"));
+  }
+
+  template<class Tx, class Ty>
   Subtype& PlotBars(const std::map<Tx, Ty>& data,
-                    const std::string& label = "",
-                    const Brush& brush = Brush("Area", DefaultBrushArea)) {
+                    const std::string& label,
+                    const Brush& brush) {
     std::vector<Tx> xdata;
     std::vector<Ty> ydata;
     xdata.reserve(data.size());
@@ -1770,10 +1780,17 @@ public:
     return PlotBars(xdata, ydata, label, brush);
 
   }
+
+  template<class Tx, class Ty>
+  Subtype& PlotBars(const std::map<Tx, Ty>& data,
+                    const std::string& label = "") {
+    return PlotBars(data, label, this->palette_.GetBrush("Area"));
+  }
+
   template<class Ty>
   Subtype& PlotBars(const std::vector<Ty>& ydata,
-                    const std::string& label = "",
-                    const Brush& brush = Brush("Area", DefaultBrushArea)) {
+                    const std::string& label,
+                    const Brush& brush) {
     const auto minmax_y = std::minmax_element(ydata.begin(), ydata.end());
     const auto min_y = *minmax_y.first;
     const auto max_y = *minmax_y.second;
@@ -1805,6 +1822,13 @@ public:
     );
     return PlotBars(std::move(bars));
   }
+
+  template<class Ty>
+  Subtype& PlotBars(const std::vector<Ty>& ydata,
+                    const std::string& label = "") {
+    return PlotBars(ydata, label, this->palette_.GetBrush("Area"));
+  }
+  
 
 protected:
   std::vector<Bar> bars_;
